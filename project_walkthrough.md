@@ -73,3 +73,23 @@ Test everything in Postman before touching React. Your endpoints should be:
 POST /api/v1/auth/register/    → creates user, returns 201
 POST /api/v1/auth/login/       → returns access + refresh tokens
 POST /api/v1/auth/refresh/     → returns new access token
+
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import BookViewSet
+
+router = DefaultRouter()
+router.register(r'books', BookViewSet)
+
+urlpatterns = [
+    path('', include(router.urls)),
+]
+```
+
+The router auto-generates all the URL patterns for you:
+```
+GET    /api/v1/books/          → list all books
+POST   /api/v1/books/          → create a book
+GET    /api/v1/books/{id}/     → get one book
+PATCH  /api/v1/books/{id}/     → update a book
+DELETE /api/v1/books/{id}/     → delete a book
