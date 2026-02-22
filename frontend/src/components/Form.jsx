@@ -15,7 +15,7 @@ function FormManual({ route, method }) {
         localStorage.setItem(ACCESS_TOKEN, res.data.access);
         (localStorage.setItem(REFRESH_TOKEN, res.data.refresh), navigate("/"));
       } catch (error) {
-        console.log(error.response.data);
+        console.log(error.response?.data ?? error.message);
       }
     } else {
       try {
@@ -27,7 +27,7 @@ function FormManual({ route, method }) {
 
         navigate("/login");
       } catch (error) {
-        console.log(error.response.data);
+        console.log(error.response?.data ?? error.message);
       }
     }
   };
