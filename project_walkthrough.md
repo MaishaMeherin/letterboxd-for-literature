@@ -51,9 +51,12 @@ uv run python manage.py startapp shelves
 
 
 # Frontend
+cd ~/Desktop/letterboxd_literature
+npm install -g yarn
 yarn create vite frontend --template react
 cd frontend
 yarn add antd @ant-design/icons zustand @tanstack/react-query axios react-router-dom
+yarn dev
 cd ..
 ```
 

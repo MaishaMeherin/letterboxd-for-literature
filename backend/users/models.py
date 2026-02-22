@@ -12,8 +12,8 @@ class CustomUser(AbstractUser):
     avatar = models.ImageField(upload_to="avatars", null=True, blank=True)
     is_private = models.BooleanField(default=True)
     
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email']
 
     def __str__(self):
         return self.username
