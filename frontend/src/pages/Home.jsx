@@ -2,20 +2,32 @@ import { useState, useEffect } from "react";
 import { Rate } from "antd";
 import api from "../api";
 import BookLogModal from "../components/BookLogModal";
+import Navbar from "../components/Navbar";
 
 function Home() {
   const [books, setBooks] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
+  const [username, setUsername] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     getBooks();
+    getUser();
   }, []);
 
   const getBooks = async () => {
     try {
       const res = await api.get("/api/v1/books/");
       setBooks(res.data.results || res.data);
+    } catch (error) {
+      console.log(error.response?.data ?? error.message);
+    }
+  };
+
+  const getUser = async () => {
+    try {
+      const res = await api.get("/api/v1/users/me/");
+      setUsername(res.data.username);
     } catch (error) {
       console.log(error.response?.data ?? error.message);
     }
@@ -37,6 +49,7 @@ function Home() {
 
   return (
     <div style={{ padding: "24px", maxWidth: 1200, margin: "0 auto" }}>
+      <Navbar />
       <h2>Browse Books</h2>
       <input
         type="text"
@@ -142,7 +155,7 @@ function Home() {
           <p style={{ color: "#888" }}>No books found.</p>
         )}
       </div>
-      
+
       <BookLogModal
         book={selectedBook}
         open={!!selectedBook}
