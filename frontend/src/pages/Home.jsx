@@ -4,11 +4,11 @@ import api from "../api";
 import BookLogModal from "../components/BookLogModal";
 import Navbar from "../components/Navbar";
 import { useNavigate } from "react-router-dom";
+import { useBookStore, useAuthStore } from "../store";
 
 function Home() {
-  const [books, setBooks] = useState([]);
-  const [selectedBook, setSelectedBook] = useState(null);
-  const [username, setUsername] = useState(null);
+  const { books, setBooks, selectedBook, setSelectedBook} = useBookStore();
+  const {username, setUsername} = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {

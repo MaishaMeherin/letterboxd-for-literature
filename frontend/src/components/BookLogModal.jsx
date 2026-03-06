@@ -2,18 +2,13 @@ import { useState, useEffect } from "react";
 import { Modal, Rate } from "antd";
 import api from "../api";
 import { ACCESS_TOKEN } from "../constants";
+import { useLogFormStore, useReviewFormStore } from "../store";
 
 function BookLogModal({ book, open, onClose }) {
-  const [status, setStatus] = useState("want_to_read");
-  const [dateStarted, setDateStarted] = useState("");
-  const [dateFinished, setDateFinished] = useState("");
-  const [currentPage, setCurrentPage] = useState(0);
-  const [notes, setNotes] = useState("");
-  const [rating, setRating] = useState(0);
-  const [existingLog, setExistingLog] = useState(null);
-  const [reviewText, setReviewText] = useState("");
-  const [containsSpoilers, setContainsSpoilers] = useState(false);
-  const [existingReview, setExistingReview] = useState(null);
+  const { status, setStatus, dateStarted, setDateStarted, dateFinished, setDateFinished, currentPage, setCurrentPage, notes, setNotes, existingLog, setExistingLog, reset } = useLogFormStore();
+
+
+  const { rating, setRating, reviewText, setReviewText, containsSpoilers, setContainsSpoilers, existingReview, setExistingReview } = useReviewFormStore();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {

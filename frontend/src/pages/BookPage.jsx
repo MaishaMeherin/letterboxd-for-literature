@@ -3,6 +3,7 @@ import api from "../api";
 import { useParams } from "react-router-dom";
 import { Rate, Button, Avatar, Input, Divider } from "antd";
 import { ACCESS_TOKEN } from "../constants";
+import { useBookStore, useReviewFormStore, useLogFormStore } from "../store";
 
 const { TextArea } = Input;
 
@@ -42,13 +43,13 @@ const card = {
 
 function BookPage() {
   const { id } = useParams();
-  const [book, setBook] = useState(null);
-  const [status, setStatus] = useState("want to read");
-  const [rating, setRating] = useState(0);
-  const [reviews, setReviews] = useState([]);
-  const [reviewText, setReviewText] = useState("");
+
+  const { book, setBook, reviews, setReviews } = useBookStore();
+  const {reviewText, setReviewText, rating, setRating, containsSpoilers, setContainsSpoilers, existingReview, setExistingReview } = useReviewFormStore();
+  const { status, setStatus } = useLogFormStore();
+
   const [loading, setLaoding] = useState(false);
-  const [containsSpoilers, setContainsSpoilers] = useState(false);
+
 
   useEffect(() => {
     if (id) {
@@ -68,7 +69,17 @@ function BookPage() {
       setReviews(reviews);
 
       const token = localStorage.getItem(ACCESS_TOKEN);
+      if (token){
+        const tokenPayload = JSON.parse(atob(token.split(".")[1]));
+        const myReview = reviews.find((r) => r.user === tokenPayload?.user_id);
 
+        if (myReview){
+          setExistingReview(myReview);
+          setRating(parseFloat(myReview.rating));
+          setReviewText(myReview.text || "");
+          setContainsSpoilers(myReview.contains_spoilers);
+        }
+      }
 
     } catch (error) {
       console.log(error);
@@ -367,7 +378,7 @@ function BookPage() {
               borderColor: "#111",
             }}
           >
-            Post Review
+            {existingReview ? "Already reviewed" : "Post Review"}
           </Button>
         </div>
       </div>
