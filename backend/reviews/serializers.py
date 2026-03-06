@@ -16,3 +16,12 @@ class ReviewSerializer(serializers.ModelSerializer):
         if float(value) not in VALID_RATINGS:
             raise serializers.ValidationError("Rating must be between 1.0 and 5.0 in 0.5 increments.")
         return value
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if request and request.method == 'POST':
+            user = request.user
+            book = attrs.get('book')
+            if Review.objects.filter(user=user, book=book).exists():
+                raise serializers.ValidationError("You have already reviewed this book.")
+        return attrs

@@ -19,22 +19,28 @@ class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
     ordering = ['-created_at']
     
+# GET /api/v1/reviews/?book=<book_id>   → all reviews for that book
+# GET /api/v1/reviews/?user=<user_id>   → all reviews by that user
     def get_queryset(self):
-        qs = Review.objects. select_related('user', 'book')
-        book_id = self.request.query_params.get('book_id')
+        qs = Review.objects.select_related('user', 'book').all()
+        book_id = self.request.query_params.get('book')
+        user_id = self.request.query_params.get('user')
+        
         
         if book_id:
             qs = qs.filter(book=book_id)
+        if user_id:
+            qs = qs.filter(user=user_id)
         return qs
     
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
-            permission_classes = [permissions.AllowAny]
-        if self.action in ['update', 'partial_update', 'destroy']:
-            permission_classes = [permissions.IsAuthenticated()]
-            
-        return [permissions.IsAuthenticated()]
+            return [permissions.AllowAny()]
+        elif self.action in ['update', 'partial_update', 'destroy', 'create']:
+            return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+        
     

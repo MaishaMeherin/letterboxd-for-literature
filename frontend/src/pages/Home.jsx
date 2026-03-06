@@ -3,6 +3,7 @@ import { Rate } from "antd";
 import api from "../api";
 import BookLogModal from "../components/BookLogModal";
 import Navbar from "../components/Navbar";
+import { useNavigate } from "react-router-dom";
 
 function Home() {
   const [books, setBooks] = useState([]);
@@ -17,8 +18,21 @@ function Home() {
 
   const getBooks = async () => {
     try {
-      const res = await api.get("/api/v1/books/");
-      setBooks(res.data.results || res.data);
+      let allBooks = [];
+      let url = "/api/v1/books/";
+      while (url) {
+        const res = await api.get(url);
+        const data = res.data;
+        allBooks = allBooks.concat(data.results || data);
+        // data.next is an absolute URL; extract just the path+query for the api instance
+        if (data.next) {
+          const nextUrl = new URL(data.next);
+          url = nextUrl.pathname + nextUrl.search;
+        } else {
+          url = null;
+        }
+      }
+      setBooks(allBooks);
     } catch (error) {
       console.log(error.response?.data ?? error.message);
     }
@@ -45,6 +59,12 @@ function Home() {
   const handleModalClose = (refresh) => {
     setSelectedBook(null); // close the modal
     if (refresh) getBooks(); // refetch books if something changed
+  };
+
+  const navigate = useNavigate();
+
+  const goToBookPage = (bookId) => {
+    navigate(`/book/${bookId}`);
   };
 
   return (
@@ -147,6 +167,11 @@ function Home() {
                   Not yet rated
                 </span>
               )}
+            </div>
+            <div>
+              <button onClick={() => goToBookPage(book.id)}>
+                go to book page
+              </button>
             </div>
           </div>
         ))}

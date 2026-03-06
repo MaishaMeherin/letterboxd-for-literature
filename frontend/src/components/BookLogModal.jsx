@@ -105,9 +105,16 @@ function BookLogModal({ book, open, onClose }) {
         };
 
         if (existingReview) {
-          await api.patch(`/api/v1/reviews/${existingReview.id}/`, reviewPayload);
+          await api.patch(
+            `/api/v1/reviews/${existingReview.id}/`,
+            reviewPayload,
+          );
         } else {
-          await api.post("/api/v1/reviews/", reviewPayload);
+          await api.post("/api/v1/reviews/", reviewPayload, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem(ACCESS_TOKEN)}`,
+            },
+          });
         }
       }
 
@@ -373,9 +380,19 @@ function BookLogModal({ book, open, onClose }) {
       </div>
 
       {/* Write a Review section */}
-      <div style={{ borderTop: '2px solid #333', marginTop: 16, paddingTop: 4 }}>
-        <p style={{ color: '#555', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, margin: '8px 0 4px' }}>
-          {existingReview ? 'Your Review' : 'Write a Review'}
+      <div
+        style={{ borderTop: "2px solid #333", marginTop: 16, paddingTop: 4 }}
+      >
+        <p
+          style={{
+            color: "#555",
+            fontSize: 11,
+            textTransform: "uppercase",
+            letterSpacing: 1,
+            margin: "8px 0 4px",
+          }}
+        >
+          {existingReview ? "Your Review" : "Write a Review"}
         </p>
 
         <div style={rowStyle}>
@@ -385,7 +402,7 @@ function BookLogModal({ book, open, onClose }) {
           </div>
         </div>
 
-        <div style={{ ...rowStyle, alignItems: 'flex-start' }}>
+        <div style={{ ...rowStyle, alignItems: "flex-start" }}>
           <span style={{ ...labelStyle, paddingTop: 6 }}>✎ Review</span>
           <div style={valueStyle}>
             <textarea
@@ -394,22 +411,32 @@ function BookLogModal({ book, open, onClose }) {
               rows={4}
               maxLength={10000}
               placeholder="Share your thoughts about this book..."
-              style={{ ...inputStyle, resize: 'vertical' }}
+              style={{ ...inputStyle, resize: "vertical" }}
             />
           </div>
         </div>
 
-        <div style={{ ...rowStyle, borderBottom: 'none' }}>
+        <div style={{ ...rowStyle, borderBottom: "none" }}>
           <span style={labelStyle}>⚠ Spoilers</span>
-          <div style={{ ...valueStyle, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div
+            style={{
+              ...valueStyle,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
             <input
               type="checkbox"
               id="spoiler-flag"
               checked={containsSpoilers}
               onChange={(e) => setContainsSpoilers(e.target.checked)}
-              style={{ width: 16, height: 16, cursor: 'pointer' }}
+              style={{ width: 16, height: 16, cursor: "pointer" }}
             />
-            <label htmlFor="spoiler-flag" style={{ color: '#888', fontSize: 13, cursor: 'pointer' }}>
+            <label
+              htmlFor="spoiler-flag"
+              style={{ color: "#888", fontSize: 13, cursor: "pointer" }}
+            >
               This review contains spoilers
             </label>
           </div>

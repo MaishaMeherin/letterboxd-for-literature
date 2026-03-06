@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import UserProfile from "./pages/UserProfile";
+import BookPage from "./pages/BookPage";
 
 function Logout() {
   localStorage.clear();
@@ -23,6 +25,8 @@ function App() {
           <Route path="/register" element={<RegisterAndLogout />} />
           <Route path="/login" element={<Login />} />
           <Route path="/logout" element={<Logout />} />
+          <Route path="/user/me" element={<UserProfile />} />
+          <Route path="/book/:id/" element={<BookPage />} />
         </Routes>
       </BrowserRouter>
     </>
