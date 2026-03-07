@@ -76,3 +76,14 @@ uv add requests
 ## Frontend run:
 cd frontend
 yarn dev
+
+
+## applying sentiment analysis 
+uv run python manage.py shell
+from reviews.models import Review
+from reviews.sentiment import analyze_sentiment
+for review in Review.objects.all():
+    review.sentiment = analyze_sentiment(review.text)
+    review.save(update_fields=['sentiment'])
+
+print("Done:", Review.objects.exclude(sentiment=None).count(), "reviews updated")

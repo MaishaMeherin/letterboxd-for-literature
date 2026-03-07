@@ -26,12 +26,6 @@ const MOCK_REVIEWS = [
   },
 ];
 
-const SENTIMENT_ROWS = [
-  { emoji: "😊", color: "#4ade80", percent: 80 },
-  { emoji: "😐", color: "#facc15", percent: 50 },
-  { emoji: "😢", color: "#93c5fd", percent: 28 },
-];
-
 const card = {
   backgroundColor: "#fff",
   borderRadius: 14,
@@ -45,11 +39,49 @@ function BookPage() {
   const { id } = useParams();
 
   const { book, setBook, reviews, setReviews } = useBookStore();
-  const {reviewText, setReviewText, rating, setRating, containsSpoilers, setContainsSpoilers, existingReview, setExistingReview } = useReviewFormStore();
+  const {
+    reviewText,
+    setReviewText,
+    rating,
+    setRating,
+    containsSpoilers,
+    setContainsSpoilers,
+    existingReview,
+    setExistingReview,
+  } = useReviewFormStore();
+
   const { status, setStatus } = useLogFormStore();
 
   const [loading, setLaoding] = useState(false);
 
+  const [comments, setComments] = useState([]);
+  const [openReviewCommentId, setReviewCommentId] = useState(null);
+  const [commentText, setCommentText] = useState("");
+
+  const total = reviews.length || 1;
+  const positiveCount = reviews.filter(
+    (r) => r.sentiment === "positive",
+  ).length;
+  const neutralCount = reviews.filter((r) => r.sentiment === "neutral").length;
+  const negativeCount = reviews.filter((r) => r.sentiment === "negative").length;
+
+  const sentimentRows = [
+    {
+      emoji: "😊",
+      color: "#4ade80",
+      percent: Math.round((positiveCount / total) * 100),
+    },
+    {
+      emoji: "😐",
+      color: "#facc15",
+      percent: Math.round((neutralCount / total) * 100),
+    },
+    {
+      emoji: "😢",
+      color: "#93c5fd",
+      percent: Math.round((negativeCount / total) * 100),
+    },
+  ];
 
   useEffect(() => {
     if (id) {
@@ -69,18 +101,17 @@ function BookPage() {
       setReviews(reviews);
 
       const token = localStorage.getItem(ACCESS_TOKEN);
-      if (token){
+      if (token) {
         const tokenPayload = JSON.parse(atob(token.split(".")[1]));
         const myReview = reviews.find((r) => r.user === tokenPayload?.user_id);
 
-        if (myReview){
+        if (myReview) {
           setExistingReview(myReview);
           setRating(parseFloat(myReview.rating));
           setReviewText(myReview.text || "");
           setContainsSpoilers(myReview.contains_spoilers);
         }
       }
-
     } catch (error) {
       console.log(error);
     }
@@ -93,7 +124,7 @@ function BookPage() {
           book: book.id,
           rating,
           text: reviewText,
-          contains_spoiler: containsSpoilers,
+          contains_spoilers: containsSpoilers,
         };
 
         await api.post("/api/v1/reviews/", reviewPayload, {
@@ -106,6 +137,58 @@ function BookPage() {
         setRating(0);
         setReviewText("");
       }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const handleLike = async (reviewId) => {
+    try {
+      const res = await api.post(`/api/v1/reviews/${reviewId}/like/`);
+
+      setReviews(
+        reviews.map((r) =>
+          r.id === reviewId ? { ...r, like_count: res.data.like_count } : r,
+        ),
+      );
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const getCommentsReview = async (reviewId) => {
+    try {
+      const commentRes = await api.get(`/api/v1/reviews/${reviewId}/comment/`);
+      const data = commentRes.data.results || commentRes.data;
+      console.log(data); //data comments is an object
+
+      setComments((prev) => ({ ...prev, [reviewId]: data }));
+      console.log(comments[reviewId]);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const handleComment = async (reviewId) => {
+    try {
+      const commentPayload = {
+        review: reviewId,
+        comment_text: commentText,
+      };
+
+      const res = await api.post(
+        `/api/v1/reviews/${reviewId}/comment/`,
+        commentPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem(ACCESS_TOKEN)}`,
+          },
+        },
+      );
+
+      getCommentsReview(reviewId);
+      setReviewCommentId(reviewId);
+      setCommentText("");
     } catch (error) {
       console.log(error);
     }
@@ -255,7 +338,7 @@ function BookPage() {
           boxShadow: "0 4px 14px rgba(30,95,78,0.3)",
         }}
       >
-        {SENTIMENT_ROWS.map(({ emoji, color, percent }) => (
+        {sentimentRows.map(({ emoji, color, percent }) => (
           <div
             key={emoji}
             style={{
@@ -472,12 +555,13 @@ function BookPage() {
                 fontWeight: 500,
               }}
             >
-              {review.likes ?? 200} Likes &nbsp;·&nbsp; {review.comments ?? 10}{" "}
-              comments
+              {review.like_count ?? 0} Likes &nbsp;·&nbsp;{" "}
+              {review.comments ?? 10} comments
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <Button
                 size="small"
+                onClick={() => handleLike(review.id)}
                 style={{
                   borderRadius: 20,
                   fontSize: 12,
@@ -490,6 +574,12 @@ function BookPage() {
               </Button>
               <Button
                 size="small"
+                onClick={() => {
+                  const isOpening = openReviewCommentId !== review.id;
+                  setReviewCommentId(isOpening ? review.id : null);
+                  setCommentText("");
+                  getCommentsReview(review.id);
+                }}
                 style={{
                   borderRadius: 20,
                   fontSize: 12,
@@ -500,6 +590,88 @@ function BookPage() {
               >
                 Comment
               </Button>
+            </div>
+
+            {openReviewCommentId === review.id && (
+              <div style={{ marginTop: 12 }}>
+                <Input.TextArea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Write a comment..."
+                  rows={3}
+                  style={{ borderRadius: 8, fontSize: 13, resize: "none" }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 8,
+                    marginTop: 8,
+                  }}
+                >
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      setReviewCommentId(null);
+                      setCommentText("");
+                    }}
+                    style={{ borderRadius: 20, fontSize: 12 }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="small"
+                    type="primary"
+                    onClick={() => handleComment(review.id)}
+                    style={{
+                      borderRadius: 20,
+                      fontSize: 12,
+                      backgroundColor: "#111",
+                      borderColor: "#111",
+                    }}
+                  >
+                    Post Comment
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Existing comments */}
+            <div style={{ marginBottom: 12 }}>
+              {(comments[review.id] || []).map((c) => (
+                <div
+                  key={c.id}
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    marginBottom: 10,
+                    padding: "8px 12px",
+                    backgroundColor: "#fafafa",
+                    borderRadius: 8,
+                    border: "1px solid #e8e8e8",
+                  }}
+                >
+                  <Avatar
+                    size={28}
+                    style={{ backgroundColor: "#c7c7cc", flexShrink: 0 }}
+                  >
+                    {(c.username?.[0] || "U").toUpperCase()}
+                  </Avatar>
+
+                  <div>
+                    <span
+                      style={{ fontWeight: 600, fontSize: 12, color: "#333" }}
+                    >
+                      {c.username}
+                    </span>
+                    <p
+                      style={{ margin: "2px 0 0", fontSize: 13, color: "#444" }}
+                    >
+                      {c.comment_text}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

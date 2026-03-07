@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Review
+from .models import Review, ReviewLike, ReviewComment
 
 VALID_RATINGS = {x / 2 for x in range(2, 11)}  # 1.0, 1.5, ..., 5.0
 
@@ -9,8 +9,8 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = ['id', 'user', 'username', 'book', 'book_title', 'reading_log','rating', 'text', 'contains_spoilers', 'like_count','created_at', 'updated_at']
-        read_only_fields = ['id', 'user', 'username', 'book_title', 'like_count','created_at', 'updated_at']
+        fields = ['id', 'user', 'username', 'book', 'book_title', 'reading_log','rating', 'text', 'contains_spoilers', 'like_count', 'comment_count', 'sentiment', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user', 'username', 'book_title', 'like_count', 'comment_count', 'sentiment','created_at', 'updated_at']
 
     def validate_rating(self, value):
         if float(value) not in VALID_RATINGS:
@@ -25,3 +25,19 @@ class ReviewSerializer(serializers.ModelSerializer):
             if Review.objects.filter(user=user, book=book).exists():
                 raise serializers.ValidationError("You have already reviewed this book.")
         return attrs
+
+
+class ReviewLikeSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = ReviewLike
+        fields = ['id', 'user', 'review']
+        read_only_fields = ['id', 'user']
+    
+class ReviewCommentSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only = True)
+    
+    class Meta:
+        model = ReviewComment
+        fields = ['id', 'user', 'username', 'review', 'comment_text', 'created_at']
+        read_only_fields = ['id', 'user', 'username', 'created_at']
