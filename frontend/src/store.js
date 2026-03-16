@@ -57,4 +57,11 @@ const useLogFormStore = create((set) => ({
   }),
 }));
 
-export { useAuthStore, useBookStore, useReviewFormStore, useLogFormStore };
+
+const usePlaylistStore = create((set) => ({
+  playlist: [],
+
+  setPlaylist: (playlist) => set({ playlist }),
+}))
+
+export { useAuthStore, useBookStore, useReviewFormStore, useLogFormStore, usePlaylistStore };

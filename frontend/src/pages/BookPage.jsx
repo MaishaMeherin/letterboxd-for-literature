@@ -3,7 +3,7 @@ import api from "../api";
 import { useParams } from "react-router-dom";
 import { Rate, Button, Avatar, Input, Divider } from "antd";
 import { ACCESS_TOKEN } from "../constants";
-import { useBookStore, useReviewFormStore, useLogFormStore } from "../store";
+import { useBookStore, useReviewFormStore, useLogFormStore, usePlaylistStore } from "../store";
 
 const { TextArea } = Input;
 
@@ -52,34 +52,43 @@ function BookPage() {
 
   const { status, setStatus } = useLogFormStore();
 
+  const { playlist, setPlaylist } = usePlaylistStore();
+
   const [loading, setLaoding] = useState(false);
 
   const [comments, setComments] = useState([]);
   const [openReviewCommentId, setReviewCommentId] = useState(null);
   const [commentText, setCommentText] = useState("");
 
-  const total = reviews.length || 1;
+
+  const totalReviews = reviews.length || 1;
   const positiveCount = reviews.filter(
     (r) => r.sentiment === "positive",
   ).length;
   const neutralCount = reviews.filter((r) => r.sentiment === "neutral").length;
-  const negativeCount = reviews.filter((r) => r.sentiment === "negative").length;
+  const negativeCount = reviews.filter(
+    (r) => r.sentiment === "negative",
+  ).length;
+
+  const sum = reviews.reduce((acc, r) => acc + parseFloat(r.rating || 0), 0);
+  const averageRating =
+    reviews.length > 0 ? (sum / reviews.length).toFixed(2) : 0;
 
   const sentimentRows = [
     {
       emoji: "😊",
       color: "#4ade80",
-      percent: Math.round((positiveCount / total) * 100),
+      percent: Math.round((positiveCount / totalReviews) * 100),
     },
     {
       emoji: "😐",
       color: "#facc15",
-      percent: Math.round((neutralCount / total) * 100),
+      percent: Math.round((neutralCount / totalReviews) * 100),
     },
     {
       emoji: "😢",
       color: "#93c5fd",
-      percent: Math.round((negativeCount / total) * 100),
+      percent: Math.round((negativeCount / totalReviews) * 100),
     },
   ];
 
@@ -114,6 +123,16 @@ function BookPage() {
       }
     } catch (error) {
       console.log(error);
+    }
+  };
+
+  const getPlaylist = async () => {
+    try {
+      const playlistRes = await api.get(`/api/v1/book/${id}/playlist/`);
+      setPlaylist(playlistRes.data);
+      console.log(playlistRes.data)
+    } catch (error) {
+      console.log(error)
     }
   };
 
@@ -281,15 +300,15 @@ function BookPage() {
             >
               <Rate
                 allowHalf
-                defaultValue={3.5}
+                defaultValue={parseFloat(averageRating)}
                 disabled
                 style={{ fontSize: 15, color: "#f59e0b" }}
               />
               <span style={{ fontWeight: 800, fontSize: 15, color: "#111" }}>
-                3.94
+                {averageRating}
               </span>
               <span style={{ color: "#888", fontSize: 12 }}>
-                1,446,065 ratings · 164,184 reviews
+                {totalReviews} reviews
               </span>
             </div>
             <div
@@ -313,6 +332,7 @@ function BookPage() {
       {/* Generate Playlist */}
       <Button
         block
+        onClick={() => getPlaylist()}
         style={{
           marginBottom: 20,
           fontWeight: 800,

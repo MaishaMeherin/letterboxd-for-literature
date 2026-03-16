@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { ACCESS_TOKEN } from "../constants";
 import BookLogModal from "../components/BookLogModal";
+import RecommendationsPage from "./RecommendationsPage";
 
 function UserProfile() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ function UserProfile() {
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState("books");
   const [selectedBook, setSelectedBook] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
 
   useEffect(() => {
     fetchProfileData();
@@ -55,6 +57,11 @@ function UserProfile() {
   const tbrLogs = logs.filter((l) => l.status === "want_to_read");
 
   const stats = [
+    {
+      label: "Recommendations",
+      count: recommendations.length,
+      section: "recommendations",
+    },
     { label: "Books", count: completedLogs.length, section: "books" },
     { label: "Diary", count: logs.length, section: "diary" },
     { label: "Reviews", count: reviews.length, section: "reviews" },
@@ -68,6 +75,7 @@ function UserProfile() {
   };
 
   const sectionTitle = {
+    recommendations: "Recommendations",
     books: "Books",
     diary: "Diary",
     reviews: "Reviews",
@@ -75,7 +83,13 @@ function UserProfile() {
   };
 
   return (
-    <div style={{ display: "flex", backgroundColor: "#0f0f0f", minHeight: "100vh" }}>
+    <div
+      style={{
+        display: "flex",
+        backgroundColor: "#0f0f0f",
+        minHeight: "100vh",
+      }}
+    >
       {/* ── Left sidebar ── */}
       <div
         style={{
@@ -114,7 +128,11 @@ function UserProfile() {
         >
           <Avatar
             size={80}
-            style={{ backgroundColor: "#1677ff", fontSize: 28, marginBottom: 10 }}
+            style={{
+              backgroundColor: "#1677ff",
+              fontSize: 28,
+              marginBottom: 10,
+            }}
           >
             {username ? username[0].toUpperCase() : "?"}
           </Avatar>
@@ -174,96 +192,104 @@ function UserProfile() {
         )}
 
         {/* Books / Diary / TBR — book card grid */}
-        {activeSection && activeSection !== "reviews" && (
-          <>
-            {sectionLogs[activeSection].length === 0 ? (
-              <p style={{ color: "#666", fontSize: 14 }}>Nothing here yet.</p>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-                {sectionLogs[activeSection].map((log) => {
-                  const book = log.book_detail;
-                  if (!book) return null;
-                  return (
-                    <div
-                      key={log.id}
-                      onClick={() => setSelectedBook(book)}
-                      style={{
-                        width: 150,
-                        backgroundColor: "#1e1e1e",
-                        borderRadius: 8,
-                        overflow: "hidden",
-                        border: "1px solid #2a2a2a",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {book.cover_url ? (
-                        <img
-                          src={book.cover_url}
-                          alt={book.title}
-                          style={{ width: "100%", height: 210, objectFit: "cover" }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: "100%",
-                            height: 210,
-                            backgroundColor: "#2a2a2a",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            padding: 10,
-                            textAlign: "center",
-                            color: "#888",
-                            fontSize: 12,
-                          }}
-                        >
-                          {book.title}
+        {activeSection &&
+          activeSection !== "reviews" &&
+          activeSection !== "recommendations" && (
+            <>
+              {sectionLogs[activeSection].length === 0 ? (
+                <p style={{ color: "#666", fontSize: 14 }}>Nothing here yet.</p>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+                  {sectionLogs[activeSection].map((log) => {
+                    const book = log.book_detail;
+                    if (!book) return null;
+                    return (
+                      <div
+                        key={log.id}
+                        onClick={() => setSelectedBook(book)}
+                        style={{
+                          width: 150,
+                          backgroundColor: "#1e1e1e",
+                          borderRadius: 8,
+                          overflow: "hidden",
+                          border: "1px solid #2a2a2a",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {book.cover_url ? (
+                          <img
+                            src={book.cover_url}
+                            alt={book.title}
+                            style={{
+                              width: "100%",
+                              height: 210,
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: "100%",
+                              height: 210,
+                              backgroundColor: "#2a2a2a",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              padding: 10,
+                              textAlign: "center",
+                              color: "#888",
+                              fontSize: 12,
+                            }}
+                          >
+                            {book.title}
+                          </div>
+                        )}
+                        <div style={{ padding: "8px 10px" }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              color: "#fff",
+                              fontSize: 12,
+                              fontWeight: 500,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {book.title}
+                          </p>
+                          <p
+                            style={{
+                              margin: "3px 0 0",
+                              color: "#666",
+                              fontSize: 11,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {book.authors?.join(", ")}
+                          </p>
+                          <span
+                            style={{
+                              fontSize: 9,
+                              color: "#555",
+                              textTransform: "uppercase",
+                              letterSpacing: 0.5,
+                            }}
+                          >
+                            {log.status.replace(/_/g, " ")}
+                          </span>
                         </div>
-                      )}
-                      <div style={{ padding: "8px 10px" }}>
-                        <p
-                          style={{
-                            margin: 0,
-                            color: "#fff",
-                            fontSize: 12,
-                            fontWeight: 500,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {book.title}
-                        </p>
-                        <p
-                          style={{
-                            margin: "3px 0 0",
-                            color: "#666",
-                            fontSize: 11,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {book.authors?.join(", ")}
-                        </p>
-                        <span
-                          style={{
-                            fontSize: 9,
-                            color: "#555",
-                            textTransform: "uppercase",
-                            letterSpacing: 0.5,
-                          }}
-                        >
-                          {log.status.replace(/_/g, " ")}
-                        </span>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        {/* Recommendations — reuses the full component */}
+        {activeSection === "recommendations" && <RecommendationsPage />}
 
         {/* Reviews section */}
         {activeSection === "reviews" && (
@@ -272,7 +298,12 @@ function UserProfile() {
               <p style={{ color: "#666", fontSize: 14 }}>No reviews yet.</p>
             ) : (
               <div
-                style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 640 }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                  maxWidth: 640,
+                }}
               >
                 {reviews.map((review) => (
                   <div

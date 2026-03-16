@@ -87,3 +87,29 @@ for review in Review.objects.all():
     review.save(update_fields=['sentiment'])
 
 print("Done:", Review.objects.exclude(sentiment=None).count(), "reviews updated")
+
+
+
+# docker
+## start
+docker compose up
+
+## seeding
+docker compose exec backend uv run python manage.py seed_trending_books
+
+## creating an app with docker
+docker compose exec backend uv run python manage.py startapp playlists
+
+## executing shell
+docker compose exec backend uv run python manage.py shell
+
+from books.models import Book
+
+Book.objects.create(
+    title="Your Story",
+    authors=["Sugaru Miaki"],
+    page_count=320,
+    genres=["Light Novel", "Romance", "Fiction", "Drama", "Science Fiction", "Japanese Literature"],
+    description="A man opposed to the now-common practice of implanting false memories is one day given memories of a fictional childhood friend. This fabricated happiness torments him, but then, to his surprise, he meets her - a girl who shouldn't exist.",
+    cover_url="https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1534787137i/41291506.jpg",
+)

@@ -1,0 +1,9 @@
+from rest_framework import serializers
+from .models import Recommendations
+
+class RecommendationsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Recommendations
+         
+        fields = ['id', 'title', 'author', 'genre', 'reason', 'created_at']
+        read_only_fields = fields

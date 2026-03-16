@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,13 +23,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-1dqo5xs!^%)j#9qe*g*vi#2af1cfhhtj)_lphp!5xsf8t3m7$1"
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-fallback")
+
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "backend"]
 
 # Application definition
 
@@ -49,6 +53,10 @@ INSTALLED_APPS = [
     'reviews',
     'logs',
     'shelves',
+    'recommendations',
+    'playlists',
+    
+    'django_celery_results',
 ]
 
 MIDDLEWARE = [
@@ -88,10 +96,15 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DB_NAME", "pageturner"),
+        "USER": os.environ.get("DB_USER", "pageturner"),
+        "PASSWORD": os.environ.get("DB_PASSWORD", "pageturner"),
+        "HOST": os.environ.get("DB_HOST", "db"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
     }
 }
+
 
 
 # Password validation
@@ -140,8 +153,10 @@ AUTH_USER_MODEL = 'users.CustomUser'
 
 # CORS — allow React dev server
 CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
+
 
 # DRF configuration
 REST_FRAMEWORK = {
@@ -161,3 +176,9 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
 }
+
+# Celery
+CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
