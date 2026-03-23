@@ -1,8 +1,0 @@
-You are a book recommendation engine. Based on the following books a user has read,
-recommend exactly 10 books they would enjoy but have NOT already read.
-
-Books already read:
-{book_list}
-
-Return ONLY valid JSON in this exact format (no extra text):
-{"recommendations": [{"title": "...", "author": "...", "genre": "...", "reason": "..."}]}

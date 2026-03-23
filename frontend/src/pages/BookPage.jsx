@@ -1,9 +1,14 @@
 import { useState, useEffect } from "react";
 import api from "../api";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Rate, Button, Avatar, Input, Divider } from "antd";
 import { ACCESS_TOKEN } from "../constants";
-import { useBookStore, useReviewFormStore, useLogFormStore, usePlaylistStore } from "../store";
+import {
+  useBookStore,
+  useReviewFormStore,
+  useLogFormStore,
+  usePlaylistStore,
+} from "../store";
 
 const { TextArea } = Input;
 
@@ -37,6 +42,7 @@ const card = {
 
 function BookPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
 
   const { book, setBook, reviews, setReviews } = useBookStore();
   const {
@@ -52,14 +58,14 @@ function BookPage() {
 
   const { status, setStatus } = useLogFormStore();
 
-  const { playlist, setPlaylist } = usePlaylistStore();
+  const { playlist, setPlaylist, existingPlaylist, setExistingPlaylist } =
+    usePlaylistStore();
 
   const [loading, setLaoding] = useState(false);
 
   const [comments, setComments] = useState([]);
   const [openReviewCommentId, setReviewCommentId] = useState(null);
   const [commentText, setCommentText] = useState("");
-
 
   const totalReviews = reviews.length || 1;
   const positiveCount = reviews.filter(
@@ -94,7 +100,9 @@ function BookPage() {
 
   useEffect(() => {
     if (id) {
+      setPlaylist([]);
       getBookDetailsAndReviews();
+      getPlaylist();
     }
   }, [id]);
 
@@ -129,10 +137,16 @@ function BookPage() {
   const getPlaylist = async () => {
     try {
       const playlistRes = await api.get(`/api/v1/book/${id}/playlist/`);
-      setPlaylist(playlistRes.data);
-      console.log(playlistRes.data)
+      const data = playlistRes.data.results || playlistRes.data;
+      setPlaylist(data);
+      console.log(data);
+
+      // const doesPlaylistExists = data.find((p) => p.book === id);
+      // if (doesPlaylistExists) {
+      //   setExistingPlaylist(doesPlaylistExists);
+      // }
     } catch (error) {
-      console.log(error)
+      console.log(error);
     }
   };
 
@@ -332,7 +346,14 @@ function BookPage() {
       {/* Generate Playlist */}
       <Button
         block
-        onClick={() => getPlaylist()}
+        onClick={async () => {
+          if (playlist.length > 0) {
+            navigate(`/book/${id}/playlist`);
+          } else {
+            await getPlaylist();
+            navigate(`/book/${id}/playlist`);
+          }
+        }}
         style={{
           marginBottom: 20,
           fontWeight: 800,
@@ -345,7 +366,7 @@ function BookPage() {
           boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
         }}
       >
-        GENERATE PLAYLIST
+        {playlist.length > 0 ? "Playlist Created " : "GENERATE PLAYLIST"}
       </Button>
 
       {/* Sentiment Chart */}
@@ -414,7 +435,7 @@ function BookPage() {
         >
           Want to read &nbsp;∨
         </Button>
-        {["genre 1", "genre 1", "genre 1"].map((g, i) => (
+        {(book?.genres || []).map((g, i) => (
           <span
             key={i}
             style={{

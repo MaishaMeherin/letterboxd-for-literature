@@ -88,7 +88,8 @@ for review in Review.objects.all():
 
 print("Done:", Review.objects.exclude(sentiment=None).count(), "reviews updated")
 
-
+## changing sentiment analysis to roberta from vader
+docker compose exec backend uv add transformers torch
 
 # docker
 ## start

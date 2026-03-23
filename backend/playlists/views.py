@@ -19,8 +19,7 @@ class PlaylistView(APIView):
         except Book.DoesNotExist:
             return Response({"error": "Book not found"}, status=404)
 
-
-   
+ 
     #if a playlist for that book already exists return
         playlist = BookPlaylist.objects.filter(book=book)
         if playlist.exists():

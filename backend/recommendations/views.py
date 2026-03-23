@@ -42,7 +42,9 @@ class RecommendationsView(APIView):
             
         saved = Recommendations.objects.filter(user=request.user)
         
-        serializer = RecommendationsSerializer(saved, many=True)
+        #many=True, tells serializer to handle a list of objects
+        serializer = RecommendationsSerializer(saved, many=True) 
+        
         
         return Response(serializer.data)
         

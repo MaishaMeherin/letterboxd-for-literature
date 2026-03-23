@@ -60,8 +60,10 @@ const useLogFormStore = create((set) => ({
 
 const usePlaylistStore = create((set) => ({
   playlist: [],
+  existingPlaylist: null,
 
   setPlaylist: (playlist) => set({ playlist }),
+  setExistingPlaylist : (existingPlaylist) => set({ existingPlaylist }),
 }))
 
 export { useAuthStore, useBookStore, useReviewFormStore, useLogFormStore, usePlaylistStore };

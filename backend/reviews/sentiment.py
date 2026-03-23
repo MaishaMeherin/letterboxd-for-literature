@@ -1,29 +1,29 @@
-import nltk
-from nltk.sentiment import SentimentIntensityAnalyzer
+_pipeline = None
 
-nltk.download('vader_lexicon', quiet=True)
-
-_sia = None
-
-def _get_sia():
-    global _sia
-    if _sia is None:
-        _sia = SentimentIntensityAnalyzer()
-    return _sia
-
+def _get_pipeline():
+    global _pipeline
+    if _pipeline is None:
+        from transformers import pipeline
+        _pipeline = pipeline(
+            "sentiment-analysis",
+            model="nlptown/bert-base-multilingual-uncased-sentiment",
+            device=-1,
+        )
+    return _pipeline
 
 def analyze_sentiment(text: str) -> str:
-    if not text or not text.strip():
-        return None
-    
-    sia = _get_sia()
-    compound = sia.polarity_scores(text)['compound']
-    
-    if compound >= 0.05:
-        return 'positive'
-    
-    elif compound <= -0.05:
-        return 'negative'
-    
+    if not text or len(text.strip()) < 3:
+        return "neutral"
+
+    pipe = _get_pipeline()
+    result = pipe(text[:512])[0]
+
+    # This model returns 1-5 stars
+    stars = int(result["label"][0])
+
+    if stars >= 4:
+        return "positive"
+    elif stars <= 2:
+        return "negative"
     else:
-        return 'neutral'
+        return "neutral"

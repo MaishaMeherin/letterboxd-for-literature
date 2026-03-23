@@ -1,0 +1,37 @@
+from reviews.sentiment_groq import analyze_sentiment
+
+tests = [
+    ("This book ended me. I couldn't stop thinking about it for days.", "positive"),
+    ("I am ruined in the best possible way.", "positive"),
+    ("Cried through the entire ending. Absolutely beautiful.", "positive"),
+    ("I'm not okay after that ending. Someone hold me. Best book of 2025.", "positive"),
+    ("This book made me ugly cry on the bus. 10/10 would do it again.", "positive"),
+    ("বইটা অসাধারণ ছিল, শেষটা মন ভেঙে দিল", "positive"),
+    ("এত সুন্দর বই জীবনে পড়িনি", "positive"),
+    ("boi ta khub bhalo chilo, ending ta cokher pani ene dilo", "positive"),
+    ("jibone eto sundor boi pori ni, heart touching", "positive"),
+    ("This book is terrible. Complete waste of time.", "negative"),
+    ("My shampoo bottle has more interesting plot than this.", "negative"),
+    ("DNF at page 50. Couldn't take the bad writing anymore.", "negative"),
+    ("The writing was beautiful but I felt absolutely nothing. Pretty but hollow.", "negative"),
+    ("এই বই পড়ে শুধু শুধু আমার সময় নষ্ট করলাম", "negative"),
+    ("লেখা এতো খারাপ যে পড়া শেষ করতে পারিনি", "negative"),
+    ("ei boi pore shudu shudu amar shomoy noshto korlam", "negative"),
+    ("lekha eto kharap je pora shesh korte parlam na", "negative"),
+    ("Wow, what a masterpiece. Said no one ever.", "negative"),
+    ("বাহ কী চমৎকার বই! ঘুমানোর জন্য perfect।", "negative"),
+    ("It was fine. Not great, not terrible. 3 stars.", "neutral"),
+    ("Plot ta amazing chilo but ending ta really disappointing lageche", "neutral"),
+]
+
+correct = 0
+total = len(tests)
+
+for text, expected in tests:
+    result = analyze_sentiment(text)
+    match = "✅" if result["sentiment"] == expected else "❌"
+    if result["sentiment"] == expected:
+        correct += 1
+    print(f'{match} Expected: {expected:8s} | Got: {result["sentiment"]:8s} | Lang: {result["language"]:8s} | Conf: {result["confidence"]:.2f} | "{text[:50]}..."')
+
+print(f"\nAccuracy: {correct}/{total} ({correct/total*100:.0f}%)")

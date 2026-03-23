@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Review, ReviewLike, ReviewComment
 from .serializers import ReviewSerializer, ReviewLikeSerializer, ReviewCommentSerializer
-from .sentiment import analyze_sentiment
+from .sentiment_groq import analyze_sentiment
 
 # Owner or read-only permissions
 class IsOwnerOrReadOnly(permissions.BasePermission):
@@ -44,13 +44,29 @@ class ReviewViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         #since user is read_only in review model, we fetch the user info from request.user set by jwt 
         text = serializer.validated_data.get('text', '')
+        book = serializer.validated_data.get('book')
+        
+        result = analyze_sentiment(text)
+        
+        existing = Review.objects.filter(user=self.request.user, book=book).first()
+        
+        if existing:
+            existing.rating = serializer.validated_data.get('rating', existing.rating)
+            existing.text = text
+            existing.contains_spoilers = serializer.validated_data.get('contains_spoilers', False)
+            existing.sentiment = result['sentiment']
+            existing.save()
+            return
         
         #read_only fields can't come from request data, so we manually inject them 
-        serializer.save(user=self.request.user, sentiment=analyze_sentiment(text))
+        serializer.save(
+            user=self.request.user,
+            sentiment=result['sentiment'],
+        )
         
     def perform_update(self, serializer):
         text = serializer.validated_data.get('text', serializer.instance.text)
-        serializer.save(sentiment=analyze_sentiment(text))
+        serializer.save(sentiment=result['sentiment'])
     
 #     POST   /api/v1/reviews/{id}/like/   → like
 #     DELETE /api/v1/reviews/{id}/like/   → unlike  
