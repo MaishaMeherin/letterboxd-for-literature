@@ -6,6 +6,8 @@ import Register from "./pages/Register";
 import UserProfile from "./pages/UserProfile";
 import BookPage from "./pages/BookPage";
 import PlaylistPage from './pages/PlaylistPage';
+import WelcomePage from "./pages/Welcome/WelcomePage";
+
 
 function Logout() {
   localStorage.clear();
@@ -22,6 +24,7 @@ function App() {
     <>
       <BrowserRouter>
         <Routes>
+          <Route path="/welcome" element={<WelcomePage />} />
           <Route path="/" element={<Home />} />
           <Route path="/register" element={<RegisterAndLogout />} />
           <Route path="/login" element={<Login />} />

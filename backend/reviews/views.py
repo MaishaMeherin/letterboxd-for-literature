@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from .models import Review, ReviewLike, ReviewComment
 from .serializers import ReviewSerializer, ReviewLikeSerializer, ReviewCommentSerializer
 from .sentiment_groq import analyze_sentiment
+from .tasks import analyze_sentiment_task
+
 
 # Owner or read-only permissions
 class IsOwnerOrReadOnly(permissions.BasePermission):
@@ -46,27 +48,32 @@ class ReviewViewSet(viewsets.ModelViewSet):
         text = serializer.validated_data.get('text', '')
         book = serializer.validated_data.get('book')
         
-        result = analyze_sentiment(text)
-        
         existing = Review.objects.filter(user=self.request.user, book=book).first()
         
         if existing:
             existing.rating = serializer.validated_data.get('rating', existing.rating)
             existing.text = text
             existing.contains_spoilers = serializer.validated_data.get('contains_spoilers', False)
-            existing.sentiment = result['sentiment']
+            existing.sentiment = 'pending'
             existing.save()
+            
+            #dispatch to celery, run in bg
+            analyze_sentiment_task.delay(str(existing.id))
             return
         
         #read_only fields can't come from request data, so we manually inject them 
-        serializer.save(
+        review = serializer.save(
             user=self.request.user,
-            sentiment=result['sentiment'],
+            sentiment='pending', #temporary, celery will update this
         )
+        
+        #dispatch to celery
+        analyze_sentiment_task.delay(str(review.id))
         
     def perform_update(self, serializer):
         text = serializer.validated_data.get('text', serializer.instance.text)
-        serializer.save(sentiment=result['sentiment'])
+        serializer.save(sentiment='pending')
+        analyze_sentiment_task(str(review.id))
     
 #     POST   /api/v1/reviews/{id}/like/   → like
 #     DELETE /api/v1/reviews/{id}/like/   → unlike  
