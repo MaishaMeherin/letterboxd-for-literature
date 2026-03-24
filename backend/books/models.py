@@ -4,6 +4,7 @@ from django.db import models
 
 class Book(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    google_books_id = models.CharField(max_length=20, null=True, blank=True)
     title = models.CharField(max_length=255, db_index=True)
     authors = models.JSONField(default=list)
     isbn_10 = models.CharField(max_length=10, null=True, blank=True, unique=True)
@@ -17,6 +18,7 @@ class Book(models.Model):
     avg_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     rating_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    
 
     def __str__(self):
         return self.title
