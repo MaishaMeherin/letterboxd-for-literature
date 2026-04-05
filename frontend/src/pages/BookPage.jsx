@@ -314,7 +314,7 @@ function BookPage() {
             >
               <Rate
                 allowHalf
-                defaultValue={parseFloat(averageRating)}
+                value={parseFloat(averageRating)}
                 disabled
                 style={{ fontSize: 15, color: "#f59e0b" }}
               />

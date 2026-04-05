@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-fallback")
 
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
-
+GOOGLE_BOOKS_API_KEY = os.environ.get('GOOGLE_BOOKS_API_KEY', '')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 

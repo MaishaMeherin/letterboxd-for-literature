@@ -6,6 +6,7 @@ from .models import Review, ReviewLike, ReviewComment
 from .serializers import ReviewSerializer, ReviewLikeSerializer, ReviewCommentSerializer
 from .sentiment_groq import analyze_sentiment
 from .tasks import analyze_sentiment_task
+from django.db.models import Avg, Count
 
 
 # Owner or read-only permissions
@@ -69,6 +70,15 @@ class ReviewViewSet(viewsets.ModelViewSet):
         
         #dispatch to celery
         analyze_sentiment_task.delay(str(review.id))
+        
+        #update book stats
+        stats = Review.objects.filter(book=book).aggregate(
+            avg=Avg('rating'),
+            count=Count('id'),
+        )
+        book.avg_rating = stats['avg'] or 0
+        book.rating_count = stats['count'] or 0
+        book.save(update_fields=['avg_rating', 'rating_count'])
         
     def perform_update(self, serializer):
         text = serializer.validated_data.get('text', serializer.instance.text)

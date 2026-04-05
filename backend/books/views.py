@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Count, Q
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Book
@@ -13,6 +13,11 @@ from .serializers import BookSerializer
 class BookViewSet(viewsets.ModelViewSet):
     queryset = Book.objects.all()
     serializer_class = BookSerializer
+    
+    #look for ?search=query parameter
+    filter_backends = [filters.SearchFilter]
+    #which fields to search in
+    search_fields = ['title', 'authors', 'genres', 'description']
     
     def get_permissions(self):
         if self.action in ['list', 'retrieve', 'trending', 'popular', 'top_rated', 'recent']: 
@@ -25,6 +30,7 @@ class BookViewSet(viewsets.ModelViewSet):
         week_ago = timezone.now() - timedelta(days=7)
         
         #for each book count its recent logs + recent reviews = activity
+        #annotate creates temporary field, Q filter what gets counted
         books = Book.objects.annotate(
             activity=Count(
                 'reading_logs',
