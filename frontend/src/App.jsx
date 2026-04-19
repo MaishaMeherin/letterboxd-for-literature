@@ -7,7 +7,8 @@ import UserProfile from "./pages/UserProfile";
 import BookPage from "./pages/BookPage";
 import PlaylistPage from './pages/PlaylistPage';
 import WelcomePage from "./pages/Welcome/WelcomePage";
-
+import BookPreviewPage from "./pages/BookPreviewPage";
+import RecommendationsPage from "./pages/RecommendationsPage";
 
 function Logout() {
   localStorage.clear();
@@ -32,6 +33,8 @@ function App() {
           <Route path="/user/me" element={<UserProfile />} />
           <Route path="/book/:id/" element={<BookPage />} />
           <Route path="/book/:id/playlist" element={<PlaylistPage />} />
+          <Route path="/book/:id/preview" element={<BookPreviewPage/>} />
+          <Route path="/recommendations" element={<RecommendationsPage/>} />
         </Routes>
       </BrowserRouter>
     </>

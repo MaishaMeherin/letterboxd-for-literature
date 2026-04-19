@@ -106,6 +106,11 @@ docker compose exec backend uv run python manage.py shell
 
 from books.models import Book
 
+## run migrate inside docker
+docker compose exec backend uv run python manage.py makemigrations books
+uv run python manage.py makemigrations books
+docker compose exec backend uv run python manage.py migrate
+
 Book.objects.create(
     title="Your Story",
     authors=["Sugaru Miaki"],
@@ -114,3 +119,43 @@ Book.objects.create(
     description="A man opposed to the now-common practice of implanting false memories is one day given memories of a fictional childhood friend. This fabricated happiness torments him, but then, to his surprise, he meets her - a girl who shouldn't exist.",
     cover_url="https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1534787137i/41291506.jpg",
 )
+
+
+# scraping
+uv add beautifulsoup4 spacy
+uv run python -m spacy download en_core_web_sm
+
+## fetch goodreads_id
+docker compose exec backend uv run python manage.py fetch_goodreads_ids 
+
+## enqueue all unscraped books
+docker compose exec backend uv run python manage.py seed_goodreads
+                                                                            
+## test with just 5 books first                                             
+docker compose exec backend uv run python manage.py seed_goodreads --limit 5     
+
+
+# seed from kaggle
+docker compose exec backend uv run python manage.py seed_from_csv --file archive/Book_Details.csv
+
+# seed book-shelf-tags from USCG Book Graph
+docker compose exec backend uv run python manage.py load_ucsd_shelves --file goodreads_books_romance.json  
+
+❯ how to check how many books have tags how many still doesn't have any tags?     
+                                                                              
+⏺ docker compose exec backend uv run python manage.py shell -c "                  
+from books.models import Book, BookShelfTag                                     
+from django.db.models import Count                                              
+                                                                                
+total = Book.objects.count()                                                    
+with_tags = Book.objects.filter(shelf_tags__isnull=False).distinct().count()
+without_tags = total - with_tags
+                                                                                
+print(f'Total books: {total}')              
+print(f'With tags: {with_tags}')                                                
+print(f'Without tags: {without_tags}')
+"   
+
+
+admin
+admin1234

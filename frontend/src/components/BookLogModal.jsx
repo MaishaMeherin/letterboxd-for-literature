@@ -1,34 +1,29 @@
 import { useState, useEffect } from "react";
-import { Modal, Rate } from "antd";
 import api from "../api";
-import { ACCESS_TOKEN } from "../constants";
-import { useLogFormStore, useReviewFormStore } from "../store";
+import { useLogFormStore } from "../store";
 
 function BookLogModal({ book, open, onClose }) {
-  const { status, setStatus, dateStarted, setDateStarted, dateFinished, setDateFinished, currentPage, setCurrentPage, notes, setNotes, existingLog, setExistingLog, reset } = useLogFormStore();
+  const {
+    status, setStatus,
+    dateStarted, setDateStarted,
+    dateFinished, setDateFinished,
+    currentPage, setCurrentPage,
+    notes, setNotes,
+    existingLog, setExistingLog,
+  } = useLogFormStore();
 
-
-  const { rating, setRating, reviewText, setReviewText, containsSpoilers, setContainsSpoilers, existingReview, setExistingReview } = useReviewFormStore();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (book && open) {
-      fetchExistingLog();
-    }
+    if (book && open) fetchExistingLog();
   }, [book, open]);
 
-  //when user open's a book modal, show 2 things simultanaeously: log of that user and book reviews of that book
   const fetchExistingLog = async () => {
     try {
-      const [logRes, reviewRes] = await Promise.all([
-        api.get("/api/v1/logs/"),
-        api.get(`/api/v1/reviews/?book=${book.id}`),
-      ]);
-
-      const logs = logRes.data.results || logRes.data;
+      const res = await api.get("/api/v1/logs/");
+      const logs = res.data.results || res.data;
       const log = logs.find((l) => l.book === book.id);
       if (log) {
-        //fill in status, dates, page, notes
         setExistingLog(log);
         setStatus(log.status);
         setDateStarted(log.date_started || "");
@@ -37,23 +32,6 @@ function BookLogModal({ book, open, onClose }) {
         setNotes(log.notes || "");
       } else {
         resetForm();
-      }
-
-      const reviews = reviewRes.data.results || reviewRes.data;
-      const token = localStorage.getItem(ACCESS_TOKEN);
-
-      //decode jwt token to get user.id
-      if (token) {
-        const tokenPayload = JSON.parse(atob(token.split(".")[1]));
-        const myReview = reviews.find((r) => r.user === tokenPayload.user_id);
-
-        if (myReview) {
-          //fill in rating, text, spoilers
-          setExistingReview(myReview);
-          setRating(parseFloat(myReview.rating));
-          setReviewText(myReview.text || "");
-          setContainsSpoilers(myReview.contains_spoilers);
-        }
       }
     } catch {
       resetForm();
@@ -67,16 +45,12 @@ function BookLogModal({ book, open, onClose }) {
     setDateFinished("");
     setCurrentPage(0);
     setNotes("");
-    setRating(0);
-    setReviewText("");
-    setContainsSpoilers(false);
-    setExistingReview(null);
   };
 
   const handleSave = async () => {
     setLoading(true);
     try {
-      const logPayload = {
+      const payload = {
         book: book.id,
         status,
         date_started: dateStarted || null,
@@ -84,37 +58,13 @@ function BookLogModal({ book, open, onClose }) {
         current_page: currentPage,
         notes,
       };
-
       if (existingLog) {
-        await api.patch(`/api/v1/logs/${existingLog.id}/`, logPayload);
+        await api.patch(`/api/v1/logs/${existingLog.id}/`, payload);
       } else {
-        await api.post("/api/v1/logs/", logPayload);
+        await api.post("/api/v1/logs/", payload);
       }
-
-      if (rating > 0) {
-        const reviewPayload = {
-          book: book.id,
-          rating,
-          text: reviewText,
-          contains_spoilers: containsSpoilers,
-        };
-
-        if (existingReview) {
-          await api.patch(
-            `/api/v1/reviews/${existingReview.id}/`,
-            reviewPayload,
-          );
-        } else {
-          await api.post("/api/v1/reviews/", reviewPayload, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem(ACCESS_TOKEN)}`,
-            },
-          });
-        }
-      }
-
-      onClose(true); // true = refresh needed
-    } catch (err) {
+      onClose(true);
+    } catch {
       alert("Failed to save log");
     }
     setLoading(false);
@@ -132,152 +82,95 @@ function BookLogModal({ book, open, onClose }) {
     setLoading(false);
   };
 
-  if (!book) return null;
+  if (!book || !open) return null;
 
   const progress = book.page_count
-    ? Math.round((currentPage / book.page_count) * 100)
+    ? Math.min(Math.round((currentPage / book.page_count) * 100), 100)
     : 0;
 
-  const labelStyle = {
-    color: "#888",
-    fontSize: 13,
-    minWidth: 120,
-  };
-
-  const valueStyle = {
-    color: "#fff",
-    fontSize: 14,
-    flex: 1,
-  };
-
-  const rowStyle = {
-    display: "flex",
-    alignItems: "center",
-    padding: "10px 0",
-    borderBottom: "1px solid #2a2a2a",
-  };
-
-  const inputStyle = {
-    padding: "6px 10px",
-    borderRadius: 4,
-    border: "1px solid #444",
-    backgroundColor: "#1a1a1a",
-    color: "#fff",
-    fontSize: 14,
-    width: "100%",
-  };
-
-  const selectStyle = {
-    ...inputStyle,
-    cursor: "pointer",
+  const STATUS_LABELS = {
+    want_to_read: "Want to Read",
+    reading: "Currently Reading",
+    completed: "Completed",
+    did_not_finish: "Did Not Finish",
+    on_hold: "On Hold",
   };
 
   return (
-    <Modal
-      open={open}
-      onCancel={() => onClose(false)}
-      footer={null}
-      width={600}
-      styles={{ content: { backgroundColor: "#141414", color: "#fff" } }}
-    >
-      {/* Book header */}
-      <div style={{ display: "flex", gap: 20, marginBottom: 24 }}>
-        {book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={book.title}
-            style={{
-              width: 120,
-              height: 180,
-              objectFit: "cover",
-              borderRadius: 4,
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              width: 120,
-              height: 180,
-              backgroundColor: "#2a2a2a",
-              borderRadius: 4,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#888",
-              textAlign: "center",
-              padding: 8,
-            }}
-          >
-            {book.title}
-          </div>
-        )}
-        <div>
-          <h2 style={{ margin: 0, color: "#fff" }}>{book.title}</h2>
-          <p style={{ color: "#888", margin: "4px 0" }}>
-            {book.authors?.join(", ") || "Unknown author"}
-          </p>
-          {book.publisher && (
-            <p style={{ color: "#666", fontSize: 12, margin: "2px 0" }}>
-              {book.publisher} {book.publish_date && `· ${book.publish_date}`}
-            </p>
-          )}
-          {book.page_count && (
-            <p style={{ color: "#666", fontSize: 12, margin: "2px 0" }}>
-              {book.page_count} pages
-            </p>
-          )}
-          {book.genres?.length > 0 && (
-            <div
-              style={{
-                marginTop: 8,
-                display: "flex",
-                gap: 4,
-                flexWrap: "wrap",
-              }}
-            >
-              {book.genres.map((g) => (
-                <span
-                  key={g}
-                  style={{
-                    padding: "2px 8px",
-                    backgroundColor: "#333",
-                    borderRadius: 4,
-                    fontSize: 11,
-                    color: "#aaa",
-                  }}
-                >
-                  {g}
-                </span>
-              ))}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm"
+        onClick={() => onClose(false)}
+      />
+
+      {/* Modal */}
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+
+        {/* Close button */}
+        <button
+          onClick={() => onClose(false)}
+          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center text-sm transition-colors z-10"
+        >
+          ✕
+        </button>
+
+        {/* Book header */}
+        <div className="p-6 pb-4 flex gap-5">
+          {book.cover_url ? (
+            <img
+              src={book.cover_url}
+              alt={book.title}
+              className="w-24 h-36 object-cover rounded-xl shadow-md shrink-0"
+            />
+          ) : (
+            <div className="w-24 h-36 rounded-xl bg-stone-100 flex items-center justify-center text-stone-400 text-xs text-center px-2 shrink-0">
+              No Cover
             </div>
           )}
+          <div className="flex-1 min-w-0 pt-1">
+            <p className="text-xs uppercase tracking-widest text-emerald-700 font-medium mb-1">
+              Reading Log
+            </p>
+            <h2 className="font-serif text-xl text-stone-900 leading-snug mb-1">
+              {book.title}
+            </h2>
+            <p className="text-sm text-stone-500 mb-2">
+              {book.authors?.join(", ") || "Unknown author"}
+            </p>
+            {book.page_count > 0 && (
+              <p className="text-xs text-stone-400 mb-3">{book.page_count} pages</p>
+            )}
+            {book.genres?.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {book.genres.slice(0, 4).map((g) => (
+                  <span
+                    key={g}
+                    className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-500 text-[11px] border border-stone-200"
+                  >
+                    {g}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      {book.description && (
-        <p
-          style={{
-            color: "#999",
-            fontSize: 13,
-            lineHeight: 1.6,
-            marginBottom: 20,
-            maxHeight: 100,
-            overflow: "auto",
-          }}
-        >
-          {book.description}
-        </p>
-      )}
+        {/* Divider */}
+        <div className="mx-6 border-t border-stone-100" />
 
-      {/* Reading log form — Notion style */}
-      <div style={{ borderTop: "1px solid #2a2a2a" }}>
-        <div style={rowStyle}>
-          <span style={labelStyle}>✦ Status</span>
-          <div style={valueStyle}>
+        {/* Form */}
+        <div className="p-6 space-y-4">
+
+          {/* Status */}
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-stone-400 font-medium mb-1.5">
+              Status
+            </label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              style={selectStyle}
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:border-emerald-400 transition-colors"
             >
               <option value="want_to_read">Want to Read</option>
               <option value="reading">Currently Reading</option>
@@ -286,217 +179,110 @@ function BookLogModal({ book, open, onClose }) {
               <option value="on_hold">On Hold</option>
             </select>
           </div>
-        </div>
 
-        <div style={rowStyle}>
-          <span style={labelStyle}># Current Page</span>
-          <div style={valueStyle}>
+          {/* Progress */}
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="text-xs uppercase tracking-widest text-stone-400 font-medium">
+                Current Page
+              </label>
+              {book.page_count > 0 && (
+                <span className="text-xs text-stone-400">
+                  {progress}% complete
+                </span>
+              )}
+            </div>
             <input
               type="number"
               value={currentPage}
               onChange={(e) => setCurrentPage(Number(e.target.value))}
               min={0}
               max={book.page_count || 99999}
-              style={inputStyle}
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:border-emerald-400 transition-colors"
             />
-          </div>
-        </div>
-
-        {book.page_count > 0 && (
-          <div style={rowStyle}>
-            <span style={labelStyle}>∑ Progress</span>
-            <div
-              style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}
-            >
-              <div
-                style={{
-                  flex: 1,
-                  height: 6,
-                  backgroundColor: "#333",
-                  borderRadius: 3,
-                }}
-              >
+            {book.page_count > 0 && (
+              <div className="mt-2 h-1.5 bg-stone-100 rounded-full overflow-hidden">
                 <div
-                  style={{
-                    width: `${Math.min(progress, 100)}%`,
-                    height: "100%",
-                    backgroundColor: "#4CAF50",
-                    borderRadius: 3,
-                  }}
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
                 />
               </div>
-              <span style={{ color: "#888", fontSize: 12 }}>{progress}%</span>
+            )}
+          </div>
+
+          {/* Dates */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-stone-400 font-medium mb-1.5">
+                Date Started
+              </label>
+              <input
+                type="date"
+                value={dateStarted}
+                onChange={(e) => setDateStarted(e.target.value)}
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:border-emerald-400 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-stone-400 font-medium mb-1.5">
+                Date Finished
+              </label>
+              <input
+                type="date"
+                value={dateFinished}
+                onChange={(e) => setDateFinished(e.target.value)}
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:border-emerald-400 transition-colors"
+              />
             </div>
           </div>
-        )}
 
-        <div style={rowStyle}>
-          <span style={labelStyle}>▶ Date Started</span>
-          <div style={valueStyle}>
-            <input
-              type="date"
-              value={dateStarted}
-              onChange={(e) => setDateStarted(e.target.value)}
-              style={inputStyle}
-            />
-          </div>
-        </div>
-
-        <div style={rowStyle}>
-          <span style={labelStyle}>■ Date Finished</span>
-          <div style={valueStyle}>
-            <input
-              type="date"
-              value={dateFinished}
-              onChange={(e) => setDateFinished(e.target.value)}
-              style={inputStyle}
-            />
-          </div>
-        </div>
-
-        <div
-          style={{
-            ...rowStyle,
-            alignItems: "flex-start",
-            borderBottom: "none",
-          }}
-        >
-          <span style={{ ...labelStyle, paddingTop: 6 }}>≡ Notes</span>
-          <div style={valueStyle}>
+          {/* Notes */}
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-stone-400 font-medium mb-1.5">
+              Notes
+            </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              placeholder="Write your thoughts..."
-              style={{ ...inputStyle, resize: "vertical" }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Write a Review section */}
-      <div
-        style={{ borderTop: "2px solid #333", marginTop: 16, paddingTop: 4 }}
-      >
-        <p
-          style={{
-            color: "#555",
-            fontSize: 11,
-            textTransform: "uppercase",
-            letterSpacing: 1,
-            margin: "8px 0 4px",
-          }}
-        >
-          {existingReview ? "Your Review" : "Write a Review"}
-        </p>
-
-        <div style={rowStyle}>
-          <span style={labelStyle}>⊙ Rating</span>
-          <div style={valueStyle}>
-            <Rate allowHalf value={rating} onChange={setRating} />
-          </div>
-        </div>
-
-        <div style={{ ...rowStyle, alignItems: "flex-start" }}>
-          <span style={{ ...labelStyle, paddingTop: 6 }}>✎ Review</span>
-          <div style={valueStyle}>
-            <textarea
-              value={reviewText}
-              onChange={(e) => setReviewText(e.target.value)}
-              rows={4}
-              maxLength={10000}
-              placeholder="Share your thoughts about this book..."
-              style={{ ...inputStyle, resize: "vertical" }}
+              rows={3}
+              placeholder="Any thoughts, quotes, or reminders..."
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700 placeholder-stone-400 resize-none focus:outline-none focus:border-emerald-400 transition-colors"
             />
           </div>
         </div>
 
-        <div style={{ ...rowStyle, borderBottom: "none" }}>
-          <span style={labelStyle}>⚠ Spoilers</span>
-          <div
-            style={{
-              ...valueStyle,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <input
-              type="checkbox"
-              id="spoiler-flag"
-              checked={containsSpoilers}
-              onChange={(e) => setContainsSpoilers(e.target.checked)}
-              style={{ width: 16, height: 16, cursor: "pointer" }}
-            />
-            <label
-              htmlFor="spoiler-flag"
-              style={{ color: "#888", fontSize: 13, cursor: "pointer" }}
-            >
-              This review contains spoilers
-            </label>
+        {/* Actions */}
+        <div className="px-6 pb-6 flex items-center justify-between">
+          <div>
+            {existingLog && (
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                className="px-4 py-2 rounded-full text-sm text-red-500 border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-40"
+              >
+                Remove Log
+              </button>
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginTop: 20,
-          paddingTop: 16,
-          borderTop: "1px solid #2a2a2a",
-        }}
-      >
-        <div>
-          {existingLog && (
+          <div className="flex gap-2">
             <button
-              onClick={handleDelete}
-              disabled={loading}
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "transparent",
-                color: "#ff4d4f",
-                border: "1px solid #ff4d4f",
-                borderRadius: 4,
-                cursor: "pointer",
-              }}
+              onClick={() => onClose(false)}
+              className="px-5 py-2 rounded-full text-sm text-stone-500 border border-stone-200 hover:bg-stone-50 transition-colors"
             >
-              Remove Log
+              Cancel
             </button>
-          )}
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="px-5 py-2 rounded-full text-sm bg-stone-900 text-[#FAF8F4] hover:bg-emerald-800 transition-colors disabled:opacity-40"
+            >
+              {loading ? "Saving..." : existingLog ? "Update Log" : "Log This Book"}
+            </button>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => onClose(false)}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "transparent",
-              color: "#fff",
-              border: "1px solid #444",
-              borderRadius: 4,
-              cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "#1677ff",
-              color: "#fff",
-              border: "none",
-              borderRadius: 4,
-              cursor: "pointer",
-            }}
-          >
-            {existingLog ? "Update Log" : "Log This Book"}
-          </button>
-        </div>
+
       </div>
-    </Modal>
+    </div>
   );
 }
 

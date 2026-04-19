@@ -1,166 +1,140 @@
 import { useState, useEffect } from "react";
-import { ACCESS_TOKEN } from "../constants";
 import api from "../api";
-import { Rate } from "antd";
-import BookLogModal from "../components/BookLogModal";
 import Navbar from "../components/Navbar";
-import { useNavigate } from "react-router-dom";
-import { useBookStore, useAuthStore } from "../store";
 
-async function fetchCover(title, author) {
-  try {
-    const query = `${title} ${author}`;
-    const res = await fetch(
-      `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=1`,
-    );
+const TIER_LABELS = {
+  comfort: "Comfort Picks",
+  discovery: "Discovery Picks",
+  adventurous: "Adventurous Picks",
+};
 
-    if (!res.ok) return null;
-
-    const data = await res.json();
-
-    //get the first element if docs exists
-    const coverId = data.docs?.[0]?.cover_i;
-    if (coverId) {
-      return `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
-    }
-  } catch (error) {
-    console.log(error);
-  }
-  return null;
-}
+const TIER_ORDER = ["comfort", "discovery", "adventurous"];
 
 function RecommendationsPage() {
   const [recommendations, setRecommendations] = useState([]);
-  const [cover, setCover] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch recommendations ONCE on mount
   useEffect(() => {
-    fetchRecommendations();
+    let timeout;
+
+    const load = async () => {
+      try{
+        const res = await api.get("/api/v1/recommendations/");
+
+        //202-> request received and accepted, but the work is not finished
+        if (res.status === 202){
+          timeout = setTimeout(load, 5000); //try again in 5 seconds
+        } else{
+          //if 200, we have real recs so we need to set the states
+          setRecommendations(res.data);
+          setLoading(false);
+        }
+      } catch (error){
+        console.log(error);
+        setLoading(false);
+      }
+    };
+
+    load();
+    return () => clearTimeout(timeout); //cleanup if components unmounts
   }, []);
 
-  // Fetch covers WHEN recommendations change
-  useEffect(() => {
-    recommendations.forEach(async (rec, index) => {
-      //avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, index * 300));
-      const url = await fetchCover(rec.title, rec.author);
+  const grouped = TIER_ORDER.reduce((acc, tier) => {
+    acc[tier] = recommendations.filter((r) => r.tier === tier);
+    return acc;
+  }, {});
 
-      //updating state inside a loop
-      setCover((prev) => ({ ...prev, [rec.id]: url }));
-    });
-  }, [recommendations]);
-
-  const fetchRecommendations = async () => {
-    try {
-      const res = await api.get("/api/v1/recommendations/");
-      setRecommendations(res.data);
-    } catch (error) {
-      console.log(error);
-    }
-    setLoading(false);
-  };
   return (
-    <div style={{ padding: "24px", maxWidth: 1200, margin: "0 auto" }}>
-      <h2>Recommended for You</h2>
-
-      {loading && <p style={{ color: "#888" }}>Loading recommendations...</p>}
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
-        {recommendations.map((rec) => (
-          <div
-            key={rec.id}
-            style={{
-              width: 200,
-              backgroundColor: "#1e1e1e",
-              borderRadius: 8,
-              overflow: "hidden",
-              border: "1px solid #333",
-            }}
+    <div className="min-h-screen bg-[#FAF8F4]">
+      <Navbar />
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <div className="mb-10">
+          <h1
+            className="font-serif text-3xl text-stone-900"
           >
-            {cover[rec.id] ? (
-              <img
-                src={cover[rec.id]}
-                alt={rec.title}
-                style={{ width: "100%", height: 280, objectFit: "cover" }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "100%",
-                  height: 280,
-                  backgroundColor: "#2a2a2a",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: 12,
-                  textAlign: "center",
-                  color: "#888",
-                }}
-              >
-                {rec.title}
-              </div>
-            )}
+            Recommended for You
+          </h1>
+          <p className="text-stone-500 text-sm mt-1">
+            Curated from your reading history
+          </p>
+        </div>
 
-            <div style={{ padding: "12px" }}>
-              <h4
-                style={{
-                  margin: 0,
-                  color: "#fff",
-                  fontSize: 14,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {rec.title}
-              </h4>
-              <p
-                style={{
-                  margin: "4px 0",
-                  color: "#888",
-                  fontSize: 12,
-                }}
-              >
-                {rec.author}
-              </p>
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "2px 8px",
-                  backgroundColor: "#333",
-                  borderRadius: 4,
-                  fontSize: 10,
-                  color: "#aaa",
-                }}
-              >
-                {rec.genre}
-              </span>
-              {rec.reason && (
-                <p
-                  style={{
-                    margin: "8px 0 0",
-                    color: "#666",
-                    fontSize: 11,
-                    lineHeight: 1.4,
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                  }}
-                >
-                  {rec.reason}
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
+        {loading && (
+          <p className="text-stone-400 text-sm">Finding your next reads...</p>
+        )}
 
         {!loading && recommendations.length === 0 && (
-          <p style={{ color: "#888" }}>
-            Log some books to get recommendations!
+          <p className="text-stone-400 text-sm">
+            Log some books to get recommendations.
           </p>
         )}
+
+        {!loading &&
+          TIER_ORDER.map((tier) => {
+            const recs = grouped[tier];
+            if (!recs.length) return null;
+            return (
+              <div key={tier} className="mb-12">
+                <h2
+                  className="font-serif text-xl text-stone-800 mb-5"
+                >
+                  {TIER_LABELS[tier]}
+                </h2>
+                <div
+                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5"
+                >
+                  {recs.map((rec) => (
+                    <div
+                      key={rec.id}
+                      className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden"
+                    >
+                      {rec.cover_url ? (
+                        <img
+                          src={rec.cover_url}
+                          alt={rec.title}
+                          className="w-full h-56 object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-56 bg-stone-100 flex items-center justify-center p-4 text-center"
+                        >
+                          <span
+                            className="font-serif text-stone-500 text-sm"
+                          >
+                            {rec.title}
+                          </span>
+                        </div>
+                      )}
+                      <div className="p-4">
+                        <h4
+                          className="font-serif text-stone-900 text-sm font-medium leading-tight truncate"
+                        >
+                          {rec.title}
+                        </h4>
+                        <p
+                          className="text-stone-400 text-xs mt-0.5 truncate"
+                        >
+                          {rec.author}
+                        </p>
+                        <span
+                          className="inline-block mt-2 px-2 py-0.5 bg-stone-100 rounded-full text-xs text-stone-500"
+                        >
+                          {rec.genre}
+                        </span>
+                        {rec.reason && (
+                          <p
+                            className="text-stone-500 text-xs mt-2 leading-relaxed line-clamp-3"
+                          >
+                            {rec.reason}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
       </div>
     </div>
   );

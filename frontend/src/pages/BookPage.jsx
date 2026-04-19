@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../api";
 import { useParams, useNavigate } from "react-router-dom";
-import { Rate, Button, Avatar, Input, Divider } from "antd";
+import { Rate } from "antd";
 import { ACCESS_TOKEN } from "../constants";
 import {
   useBookStore,
@@ -9,36 +9,7 @@ import {
   useLogFormStore,
   usePlaylistStore,
 } from "../store";
-
-const { TextArea } = Input;
-
-const MOCK_REVIEWS = [
-  {
-    id: 1,
-    username: "username",
-    rating: 4,
-    text: "Review",
-    likes: 200,
-    comments: 10,
-  },
-  {
-    id: 2,
-    username: "username",
-    rating: 4,
-    text: "Review",
-    likes: 200,
-    comments: 10,
-  },
-];
-
-const card = {
-  backgroundColor: "#fff",
-  borderRadius: 14,
-  padding: "20px 24px",
-  marginBottom: 20,
-  boxShadow: "0 2px 10px rgba(0,0,0,0.09)",
-  border: "1px solid #e8e8e8",
-};
+import Navbar from "../components/Navbar";
 
 function BookPage() {
   const { id } = useParams();
@@ -56,16 +27,14 @@ function BookPage() {
     setExistingReview,
   } = useReviewFormStore();
 
-  const { status, setStatus } = useLogFormStore();
-
-  const { playlist, setPlaylist, existingPlaylist, setExistingPlaylist } =
-    usePlaylistStore();
-
-  const [loading, setLaoding] = useState(false);
+  useLogFormStore();
+  const { playlist, setPlaylist } = usePlaylistStore();
 
   const [comments, setComments] = useState([]);
   const [openReviewCommentId, setReviewCommentId] = useState(null);
-  const [commentText, setCommentText] = useState("");
+  const [shelfTags, setShelfTags] = useState([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [commentTexts, setCommentTexts] = useState({});
 
   const totalReviews = reviews.length || 1;
   const positiveCount = reviews.filter(
@@ -82,28 +51,27 @@ function BookPage() {
 
   const sentimentRows = [
     {
+      label: "Positive",
       emoji: "😊",
-      color: "#4ade80",
+      color: "bg-emerald-400",
       percent: Math.round((positiveCount / totalReviews) * 100),
     },
     {
+      label: "Neutral",
       emoji: "😐",
-      color: "#facc15",
+      color: "bg-amber-400",
       percent: Math.round((neutralCount / totalReviews) * 100),
     },
     {
+      label: "Sad",
       emoji: "😢",
-      color: "#93c5fd",
+      color: "bg-blue-300",
       percent: Math.round((negativeCount / totalReviews) * 100),
     },
   ];
 
   useEffect(() => {
-    if (id) {
-      setPlaylist([]);
-      getBookDetailsAndReviews();
-      getPlaylist();
-    }
+    if (id) getBookDetailsAndReviews();
   }, [id]);
 
   const getBookDetailsAndReviews = async () => {
@@ -113,15 +81,22 @@ function BookPage() {
         api.get(`/api/v1/reviews/?book=${id}`),
       ]);
       setBook(bookRes.data.results || bookRes.data);
+      const fetchedReviews = reviewsRes.data.results || reviewsRes.data;
+      setReviews(fetchedReviews);
 
-      const reviews = reviewsRes.data.results || reviewsRes.data;
-      setReviews(reviews);
+      try {
+        const tagsRes = await api.get(`/api/v1/books/${id}/shelf-tags/`);
+        setShelfTags(tagsRes.data || []);
+      } catch (_) {
+        // endpoint not yet available — section stays hidden
+      }
 
       const token = localStorage.getItem(ACCESS_TOKEN);
       if (token) {
         const tokenPayload = JSON.parse(atob(token.split(".")[1]));
-        const myReview = reviews.find((r) => r.user === tokenPayload?.user_id);
-
+        const myReview = fetchedReviews.find(
+          (r) => r.user === tokenPayload?.user_id,
+        );
         if (myReview) {
           setExistingReview(myReview);
           setRating(parseFloat(myReview.rating));
@@ -136,15 +111,8 @@ function BookPage() {
 
   const getPlaylist = async () => {
     try {
-      const playlistRes = await api.get(`/api/v1/book/${id}/playlist/`);
-      const data = playlistRes.data.results || playlistRes.data;
-      setPlaylist(data);
-      console.log(data);
-
-      // const doesPlaylistExists = data.find((p) => p.book === id);
-      // if (doesPlaylistExists) {
-      //   setExistingPlaylist(doesPlaylistExists);
-      // }
+      const res = await api.get(`/api/v1/book/${id}/playlist/`);
+      setPlaylist(res.data.results || res.data);
     } catch (error) {
       console.log(error);
     }
@@ -153,19 +121,20 @@ function BookPage() {
   const handlePostReview = async () => {
     try {
       if (rating > 0) {
-        const reviewPayload = {
-          book: book.id,
-          rating,
-          text: reviewText,
-          contains_spoilers: containsSpoilers,
-        };
-
-        await api.post("/api/v1/reviews/", reviewPayload, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem(ACCESS_TOKEN)}`,
+        await api.post(
+          "/api/v1/reviews/",
+          {
+            book: book.id,
+            rating,
+            text: reviewText,
+            contains_spoilers: containsSpoilers,
           },
-        });
-
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem(ACCESS_TOKEN)}`,
+            },
+          },
+        );
         getBookDetailsAndReviews();
         setRating(0);
         setReviewText("");
@@ -175,13 +144,44 @@ function BookPage() {
     }
   };
 
+  const handleDeleteReview = async () => {
+    if (!existingReview) return;
+
+    try {
+      await api.delete(`/api/v1/reviews/${existingReview.id}`);
+      setExistingReview(null);
+      setRating(0);
+      setReviewText("");
+      setIsEditing(false);
+      getBookDetailsAndReviews();
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const handleUpdateReview = async () => {
+    if (!existingReview || rating === 0) return;
+    try {
+      await api.patch(`/api/v1/reviews/${existingReview.id}/`, {
+        rating,
+        text: reviewText,
+        contains_spoilers: containsSpoilers,
+      });
+      setIsEditing(false);
+      getBookDetailsAndReviews();
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   const handleLike = async (reviewId) => {
     try {
       const res = await api.post(`/api/v1/reviews/${reviewId}/like/`);
-
       setReviews(
         reviews.map((r) =>
-          r.id === reviewId ? { ...r, like_count: res.data.like_count } : r,
+          r.id === reviewId
+            ? { ...r, like_count: res.data.like_count, liked_by_user: res.data.liked }
+            : r,
         ),
       );
     } catch (error) {
@@ -191,548 +191,385 @@ function BookPage() {
 
   const getCommentsReview = async (reviewId) => {
     try {
-      const commentRes = await api.get(`/api/v1/reviews/${reviewId}/comment/`);
-      const data = commentRes.data.results || commentRes.data;
-      console.log(data); //data comments is an object
-
-      setComments((prev) => ({ ...prev, [reviewId]: data }));
-      console.log(comments[reviewId]);
+      const res = await api.get(`/api/v1/reviews/${reviewId}/comment/`);
+      setComments((prev) => ({
+        ...prev,
+        [reviewId]: res.data.results || res.data,
+      }));
     } catch (error) {
       console.log(error);
     }
   };
 
   const handleComment = async (reviewId) => {
+    const text = commentTexts[reviewId] || "";
+    if (!text.trim()) return;
+
     try {
-      const commentPayload = {
+      await api.post(`/api/v1/reviews/${reviewId}/comment/`, {
         review: reviewId,
-        comment_text: commentText,
-      };
-
-      const res = await api.post(
-        `/api/v1/reviews/${reviewId}/comment/`,
-        commentPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem(ACCESS_TOKEN)}`,
-          },
-        },
-      );
-
+        comment_text: text,
+      });
       getCommentsReview(reviewId);
-      setReviewCommentId(reviewId);
-      setCommentText("");
+      setCommentTexts((prev) => ({ ...prev, [reviewId]: "" }));
     } catch (error) {
       console.log(error);
     }
   };
 
-  const displayReviews = reviews.length > 0 ? reviews : MOCK_REVIEWS;
-
   return (
-    <div
-      style={{
-        width: "100%",
-        minHeight: "100vh",
-        backgroundColor: "#f2f2f7",
-        padding: "28px 32px",
-        boxSizing: "border-box",
-        fontFamily: "sans-serif",
-      }}
-    >
-      {/* Book Header Card */}
-      <div style={card}>
-        <div style={{ display: "flex", gap: 20 }}>
+    <div className="min-h-screen bg-[#FAF8F4]">
+      <Navbar />
+
+      <div className="max-w-3xl mx-auto px-6 py-10">
+        {/* ── Book Header ── */}
+        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6 mb-6 flex gap-6">
           {book?.cover_url ? (
             <img
               src={book.cover_url}
               alt={book.title}
-              style={{
-                width: 120,
-                height: 160,
-                objectFit: "cover",
-                borderRadius: 10,
-                flexShrink: 0,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              }}
+              className="w-28 h-40 object-cover rounded-xl shadow-md shrink-0"
             />
           ) : (
-            <div
-              style={{
-                width: 120,
-                height: 160,
-                background: "linear-gradient(135deg, #d0d0d0, #b0b0b0)",
-                borderRadius: 10,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#666",
-                fontSize: 12,
-                fontWeight: 600,
-                textAlign: "center",
-                flexShrink: 0,
-                letterSpacing: 0.5,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              }}
-            >
-              BOOK
-              <br />
-              COVER
+            <div className="w-28 h-40 rounded-xl bg-stone-100 flex items-center justify-center text-stone-400 text-xs font-medium shrink-0">
+              No Cover
             </div>
           )}
-          <div style={{ flex: 1 }}>
-            <h2
-              style={{
-                fontWeight: 900,
-                textTransform: "uppercase",
-                margin: "0 0 4px",
-                fontSize: 22,
-                color: "#111",
-                letterSpacing: 0.5,
-              }}
-            >
-              {book?.title || "BOOK NAME"}
-            </h2>
-            <p
-              style={{
-                color: "#555",
-                margin: "0 0 12px",
-                fontSize: 14,
-                fontWeight: 500,
-              }}
-            >
-              {book?.authors?.join(", ") || "Author name"}
+
+          <div className="flex-1 min-w-0">
+            <h1 className="font-serif text-2xl text-stone-900 leading-snug mb-1">
+              {book?.title || "Book Title"}
+            </h1>
+            <p className="text-sm text-stone-500 mb-3">
+              {book?.authors?.join(", ") || "Author"}
             </p>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 14,
-                flexWrap: "wrap",
-              }}
-            >
+
+            <div className="flex items-center gap-2 mb-4">
               <Rate
                 allowHalf
                 value={parseFloat(averageRating)}
                 disabled
-                style={{ fontSize: 15, color: "#f59e0b" }}
+                style={{ fontSize: 14, color: "#f59e0b" }}
               />
-              <span style={{ fontWeight: 800, fontSize: 15, color: "#111" }}>
+              <span className="text-sm font-semibold text-stone-800">
                 {averageRating}
               </span>
-              <span style={{ color: "#888", fontSize: 12 }}>
-                {totalReviews} reviews
+              <span className="text-xs text-stone-400">
+                · {reviews.length} reviews
               </span>
             </div>
-            <div
-              style={{
-                border: "1.5px solid #d0d0d0",
-                borderRadius: 8,
-                padding: "10px 12px",
-                color: "#444",
-                fontSize: 13,
-                minHeight: 60,
-                backgroundColor: "#fafafa",
-                lineHeight: 1.5,
-              }}
-            >
-              {book?.description || "Description"}
-            </div>
+
+            <p className="text-sm text-stone-500 leading-relaxed line-clamp-4">
+              {book?.description || "No description available."}
+            </p>
           </div>
         </div>
-      </div>
 
-      {/* Generate Playlist */}
-      <Button
-        block
-        onClick={async () => {
-          if (playlist.length > 0) {
-            navigate(`/book/${id}/playlist`);
-          } else {
-            await getPlaylist();
-            navigate(`/book/${id}/playlist`);
-          }
-        }}
-        style={{
-          marginBottom: 20,
-          fontWeight: 800,
-          fontSize: 15,
-          height: 50,
-          borderRadius: 12,
-          letterSpacing: 2,
-          border: "2px solid #111",
-          color: "#111",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-        }}
-      >
-        {playlist.length > 0 ? "Playlist Created " : "GENERATE PLAYLIST"}
-      </Button>
-
-      {/* Sentiment Chart */}
-      <div
-        style={{
-          backgroundColor: "#1e5f4e",
-          borderRadius: 14,
-          padding: "22px 28px",
-          marginBottom: 20,
-          boxShadow: "0 4px 14px rgba(30,95,78,0.3)",
-        }}
-      >
-        {sentimentRows.map(({ emoji, color, percent }) => (
-          <div
-            key={emoji}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              marginBottom: 14,
-            }}
-          >
-            <span style={{ fontSize: 32, lineHeight: 1 }}>{emoji}</span>
-            <div
-              style={{
-                flex: 1,
-                height: 24,
-                backgroundColor: "#0d3d2e",
-                borderRadius: 12,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: `${percent}%`,
-                  height: "100%",
-                  backgroundColor: color,
-                  borderRadius: 12,
-                  transition: "width 0.4s ease",
-                }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Status + Genres */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          marginBottom: 20,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
-        <Button
-          style={{
-            borderRadius: 20,
-            fontWeight: 600,
-            fontSize: 13,
-            borderColor: "#333",
-            color: "#333",
-            height: 34,
-          }}
-        >
-          Want to read &nbsp;∨
-        </Button>
-        {(book?.genres || []).map((g, i) => (
-          <span
-            key={i}
-            style={{
-              padding: "5px 16px",
-              border: "1.5px solid #aaa",
-              borderRadius: 20,
-              fontSize: 13,
-              color: "#333",
-              fontWeight: 500,
-              backgroundColor: "#fff",
-            }}
-          >
-            {g}
-          </span>
-        ))}
-      </div>
-
-      {/* Rate + Write Review Card */}
-      <div style={card}>
-        <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <h3
-            style={{
-              fontWeight: 800,
-              fontSize: 20,
-              margin: "0 0 10px",
-              color: "#111",
-            }}
-          >
-            Rate
-          </h3>
-          <Rate
-            allowHalf
-            value={rating}
-            onChange={setRating}
-            style={{ fontSize: 32, color: rating > 0 ? "#f59e0b" : "#d0d0d0" }}
-          />
-        </div>
-        <Divider style={{ margin: "16px 0", borderColor: "#e0e0e0" }} />
-        <TextArea
-          placeholder="Write a review..."
-          rows={4}
-          value={reviewText}
-          onChange={(e) => setReviewText(e.target.value)}
-          style={{
-            borderRadius: 10,
-            fontSize: 14,
-            border: "1.5px solid #d0d0d0",
-            resize: "none",
-          }}
-        />
-        <div
-          style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}
-        >
-          <Button
-            type="primary"
-            onClick={() => handlePostReview()}
-            style={{
-              borderRadius: 20,
-              fontWeight: 700,
-              fontSize: 14,
-              height: 38,
-              paddingInline: 24,
-              backgroundColor: "#111",
-              borderColor: "#111",
-            }}
-          >
-            {existingReview ? "Already reviewed" : "Post Review"}
-          </Button>
-        </div>
-      </div>
-
-      {/* Reviews Section Label */}
-      <h4
-        style={{
-          fontWeight: 700,
-          fontSize: 16,
-          color: "#333",
-          marginBottom: 12,
-          paddingLeft: 4,
-        }}
-      >
-        Community Reviews
-      </h4>
-
-      {/* Review Cards */}
-      {displayReviews.map((review) => (
-        <div
-          key={review.id}
-          style={{
-            ...card,
-            display: "flex",
-            gap: 16,
-            padding: "18px 20px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 6,
-              minWidth: 58,
-            }}
-          >
-            <Avatar
-              size={50}
-              style={{
-                backgroundColor: "#c7c7cc",
-                color: "#fff",
-                fontWeight: 700,
-              }}
-            >
-              {(review.username?.[0] || "U").toUpperCase()}
-            </Avatar>
-            <span style={{ fontSize: 12, color: "#444", fontWeight: 600 }}>
-              {review.username}
-            </span>
-          </div>
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 10,
-              }}
-            >
-              <Rate
-                allowHalf
-                value={parseFloat(review.rating)}
-                disabled
-                style={{ fontSize: 15, color: "#f59e0b" }}
-              />
-              <span style={{ fontWeight: 700, fontSize: 13, color: "#222" }}>
-                {review.rating} stars
+        {/* ── Genre Tags ── */}
+        {book?.genres?.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            {book.genres.map((g, i) => (
+              <span
+                key={i}
+                className="px-3 py-1 rounded-full text-xs font-medium border border-stone-200 text-stone-600 bg-white"
+              >
+                {g}
               </span>
-            </div>
-            <div
-              style={{
-                border: "1.5px solid #d8d8d8",
-                borderRadius: 8,
-                padding: "10px 12px",
-                color: "#333",
-                fontSize: 13,
-                marginBottom: 10,
-                minHeight: 40,
-                backgroundColor: "#fafafa",
-                lineHeight: 1.5,
-              }}
-            >
-              {review.text || "Review"}
-            </div>
-            <div
-              style={{
-                color: "#888",
-                fontSize: 12,
-                marginBottom: 10,
-                fontWeight: 500,
-              }}
-            >
-              {review.like_count ?? 0} Likes &nbsp;·&nbsp;{" "}
-              {review.comments ?? 10} comments
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Button
-                size="small"
-                onClick={() => handleLike(review.id)}
-                style={{
-                  borderRadius: 20,
-                  fontSize: 12,
-                  borderColor: "#bbb",
-                  color: "#333",
-                  fontWeight: 600,
-                }}
-              >
-                Like
-              </Button>
-              <Button
-                size="small"
-                onClick={() => {
-                  const isOpening = openReviewCommentId !== review.id;
-                  setReviewCommentId(isOpening ? review.id : null);
-                  setCommentText("");
-                  getCommentsReview(review.id);
-                }}
-                style={{
-                  borderRadius: 20,
-                  fontSize: 12,
-                  borderColor: "#bbb",
-                  color: "#333",
-                  fontWeight: 600,
-                }}
-              >
-                Comment
-              </Button>
-            </div>
+            ))}
+          </div>
+        )}
 
-            {openReviewCommentId === review.id && (
-              <div style={{ marginTop: 12 }}>
-                <Input.TextArea
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Write a comment..."
-                  rows={3}
-                  style={{ borderRadius: 8, fontSize: 13, resize: "none" }}
+        {/* ── Vibes & Moods ── */}
+        {shelfTags.length > 0 && (
+          <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5 mb-6">
+            <p className="text-xs uppercase tracking-widest text-stone-400 font-medium mb-3">
+              Vibes &amp; Moods
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {shelfTags.map((t) =>
+                t.mention_count > 0 ? (
+                  <span
+                    key={t.tag}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-medium"
+                  >
+                    {t.tag}
+                    <span className="text-emerald-500 text-[10px] font-normal">
+                      {t.mention_count}
+                    </span>
+                  </span>
+                ) : (
+                  <span
+                    key={t.tag}
+                    className="px-3 py-1 rounded-full bg-stone-50 text-stone-500 border border-dashed border-stone-300 text-xs"
+                  >
+                    {t.tag}
+                  </span>
+                ),
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Action Buttons ── */}
+        <div className="flex gap-3 mb-6">
+          <button
+            onClick={async () => {
+              if (playlist.length > 0) {
+                navigate(`/book/${id}/playlist`);
+              } else {
+                await getPlaylist();
+                navigate(`/book/${id}/playlist`);
+              }
+            }}
+            className="flex-1 h-11 rounded-full bg-stone-900 text-[#FAF8F4] text-sm font-medium tracking-wide hover:bg-emerald-800 transition-colors"
+          >
+            {playlist.length > 0 ? "View Playlist" : "Generate Playlist"}
+          </button>
+          <button
+            onClick={() => navigate(`/book/${id}/preview`)}
+            className="flex-1 h-11 rounded-full border border-stone-300 text-stone-700 text-sm font-medium tracking-wide hover:border-stone-500 hover:text-stone-900 transition-colors"
+          >
+            Read Preview
+          </button>
+        </div>
+
+        {/* ── Sentiment Chart ── */}
+        <div className="bg-emerald-900 rounded-2xl p-6 mb-6">
+          <p className="text-xs uppercase tracking-widest text-emerald-300 mb-4 font-medium">
+            Reader Sentiment
+          </p>
+          <div className="space-y-3">
+            {sentimentRows.map(({ label, emoji, color, percent }) => (
+              <div key={label} className="flex items-center gap-3">
+                <span className="text-2xl w-8">{emoji}</span>
+                <div className="flex-1 h-5 bg-emerald-950 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${color} rounded-full transition-all duration-500`}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+                <span className="text-xs text-emerald-300 w-8 text-right">
+                  {percent}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Rate & Review ── */}
+        <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6 mb-6">
+          <h2 className="font-serif text-lg text-stone-900 mb-4">Your Review</h2>
+
+          {existingReview && !isEditing ? (
+            /* Show existing review with edit/delete options */
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Rate
+                  allowHalf
+                  value={parseFloat(existingReview.rating)}
+                  disabled
+                  style={{ fontSize: 16, color: "#f59e0b" }}
                 />
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                    gap: 8,
-                    marginTop: 8,
-                  }}
+                <span className="text-sm text-stone-500">{existingReview.rating} stars</span>
+              </div>
+              {existingReview.text && (
+                <p className="text-sm text-stone-600 leading-relaxed mb-4">{existingReview.text}</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="px-5 py-2 rounded-full text-sm border border-stone-300 text-stone-600 hover:bg-stone-50 transition-colors"
                 >
-                  <Button
-                    size="small"
-                    onClick={() => {
-                      setReviewCommentId(null);
-                      setCommentText("");
-                    }}
-                    style={{ borderRadius: 20, fontSize: 12 }}
+                  Edit
+                </button>
+                <button
+                  onClick={handleDeleteReview}
+                  className="px-5 py-2 rounded-full text-sm border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Write or edit form */
+            <div>
+              <div className="flex justify-center mb-4">
+                <Rate
+                  allowHalf
+                  value={rating}
+                  onChange={setRating}
+                  style={{ fontSize: 28, color: rating > 0 ? "#f59e0b" : "#d6d3d1" }}
+                />
+              </div>
+              <textarea
+                placeholder="Write a review..."
+                rows={4}
+                value={reviewText}
+                onChange={(e) => setReviewText(e.target.value)}
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700 placeholder-stone-400 resize-none focus:outline-none focus:border-stone-400 transition-colors"
+              />
+              <div className="flex items-center justify-between mt-3">
+                <label className="flex items-center gap-2 text-xs text-stone-500 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={containsSpoilers}
+                    onChange={(e) => setContainsSpoilers(e.target.checked)}
+                    className="rounded"
+                  />
+                  Contains spoilers
+                </label>
+                <div className="flex gap-2">
+                  {isEditing && (
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="px-5 py-2 rounded-full text-sm border border-stone-200 text-stone-500 hover:bg-stone-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    onClick={isEditing ? handleUpdateReview : handlePostReview}
+                    disabled={rating === 0}
+                    className="px-6 py-2 rounded-full bg-stone-900 text-[#FAF8F4] text-sm font-medium hover:bg-emerald-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="small"
-                    type="primary"
-                    onClick={() => handleComment(review.id)}
-                    style={{
-                      borderRadius: 20,
-                      fontSize: 12,
-                      backgroundColor: "#111",
-                      borderColor: "#111",
-                    }}
-                  >
-                    Post Comment
-                  </Button>
+                    {isEditing ? "Update Review" : "Post Review"}
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
+          )}
+        </div>
 
-            {/* Existing comments */}
-            <div style={{ marginBottom: 12 }}>
-              {(comments[review.id] || []).map((c) => (
-                <div
-                  key={c.id}
-                  style={{
-                    display: "flex",
-                    gap: 10,
-                    marginBottom: 10,
-                    padding: "8px 12px",
-                    backgroundColor: "#fafafa",
-                    borderRadius: 8,
-                    border: "1px solid #e8e8e8",
-                  }}
-                >
-                  <Avatar
-                    size={28}
-                    style={{ backgroundColor: "#c7c7cc", flexShrink: 0 }}
-                  >
-                    {(c.username?.[0] || "U").toUpperCase()}
-                  </Avatar>
+        {/* ── Community Reviews ── */}
+        <h2 className="font-serif text-lg text-stone-900 mb-4">
+          Community Reviews
+        </h2>
 
-                  <div>
-                    <span
-                      style={{ fontWeight: 600, fontSize: 12, color: "#333" }}
-                    >
-                      {c.username}
+        {reviews.length === 0 && (
+          <p className="text-sm text-stone-400 text-center py-10">
+            No reviews yet. Be the first to write one.
+          </p>
+        )}
+
+        <div className="space-y-5">
+          {reviews.map((review) => {
+            const sentimentColor = {
+              positive: "bg-emerald-50 text-emerald-700 border-emerald-200",
+              neutral:  "bg-amber-50 text-amber-700 border-amber-200",
+              negative: "bg-blue-50 text-blue-700 border-blue-200",
+            }[review.sentiment] || "";
+
+            return (
+              <div key={review.id} className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
+
+                {/* ── Review header: avatar, name, stars, date, sentiment ── */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-stone-200 text-stone-600 text-sm font-semibold flex items-center justify-center shrink-0">
+                      {(review.username?.[0] || "U").toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-stone-800">{review.username}</p>
+                      <div className="flex items-center gap-1.5">
+                        <Rate allowHalf value={parseFloat(review.rating)} disabled style={{ fontSize: 11, color: "#f59e0b" }} />
+                        <span className="text-xs text-stone-400">{review.rating}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {review.sentiment && sentimentColor && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${sentimentColor}`}>
+                        {review.sentiment}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-stone-400">
+                      {new Date(review.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </span>
-                    <p
-                      style={{ margin: "2px 0 0", fontSize: 13, color: "#444" }}
-                    >
-                      {c.comment_text}
-                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ))}
 
-      {/* Pagination Dots */}
-      <div style={{ textAlign: "center", marginTop: 8, paddingBottom: 32 }}>
-        {[...Array(9)].map((_, i) => (
-          <span
-            key={i}
-            style={{
-              display: "inline-block",
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              backgroundColor: i === 0 ? "#555" : "#c7c7cc",
-              margin: "0 4px",
-            }}
-          />
-        ))}
+                {/* ── Spoiler warning ── */}
+                {review.contains_spoilers && (
+                  <p className="text-[10px] text-amber-600 font-medium mb-2 uppercase tracking-wider">⚠ Contains spoilers</p>
+                )}
+
+                {/* ── Review text ── */}
+                <p className="text-sm text-stone-600 leading-relaxed mb-4">
+                  {review.text || <span className="text-stone-300 italic">No written review.</span>}
+                </p>
+
+                {/* ── Like + Comment actions ── */}
+                <div className="flex items-center gap-4 pt-3 border-t border-stone-50">
+                  <button
+                    onClick={() => handleLike(review.id)}
+                    className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${
+                      review.liked_by_user ? "text-rose-500" : "text-stone-400 hover:text-rose-400"
+                    }`}
+                  >
+                    {review.liked_by_user ? "♥" : "♡"} {review.like_count ?? 0}
+                  </button>
+                  <button
+                    onClick={() => {
+                      const isOpening = openReviewCommentId !== review.id;
+                      setReviewCommentId(isOpening ? review.id : null);
+                      if (isOpening) getCommentsReview(review.id);
+                    }}
+                    className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-emerald-700 transition-colors font-medium"
+                  >
+                    💬 {review.comment_count ?? 0}
+                  </button>
+                </div>
+
+                {/* ── Comment input (shown when that review's toggle is open) ── */}
+                {openReviewCommentId === review.id && (
+                  <div className="mt-4">
+                    <textarea
+                      value={commentTexts[review.id] || ""}
+                      onChange={(e) => setCommentTexts((prev) => ({ ...prev, [review.id]: e.target.value }))}
+                      placeholder="Write a comment..."
+                      rows={2}
+                      className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-700 placeholder-stone-400 resize-none focus:outline-none focus:border-stone-400 transition-colors"
+                    />
+                    <div className="flex justify-end gap-2 mt-2">
+                      <button
+                        onClick={() => setReviewCommentId(null)}
+                        className="px-4 py-1.5 rounded-full text-xs text-stone-500 border border-stone-200 hover:bg-stone-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleComment(review.id)}
+                        className="px-4 py-1.5 rounded-full text-xs bg-stone-900 text-[#FAF8F4] hover:bg-emerald-800 transition-colors"
+                      >
+                        Post
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Existing comments ── */}
+                {(comments[review.id] || []).length > 0 && (
+                  <div className="mt-4 space-y-3 border-t border-stone-100 pt-4">
+                    {(comments[review.id] || []).map((c) => (
+                      <div key={c.id} className="flex gap-3">
+                        <div className="w-7 h-7 rounded-full bg-stone-100 text-stone-500 text-xs font-semibold flex items-center justify-center shrink-0">
+                          {(c.username?.[0] || "U").toUpperCase()}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-stone-700">{c.username}</p>
+                          <p className="text-xs text-stone-500 mt-0.5 leading-relaxed">{c.comment_text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="pb-16" />
       </div>
     </div>
   );

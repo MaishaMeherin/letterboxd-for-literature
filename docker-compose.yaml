@@ -26,6 +26,7 @@ services:
       DB_PORT: "5432"
       GROQ_API_KEY: "${GROQ_API_KEY}"
       GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY}
+      APIFY_API_TOKEN: "${APIFY_API_TOKEN}"
       DEBUG: "True"
       REDIS_URL: "redis://redis:6379/0"
     depends_on:
@@ -62,6 +63,7 @@ services:
       DB_HOST: db
       DB_PORT: "5432"
       GROQ_API_KEY: "${GROQ_API_KEY}"
+      APIFY_API_TOKEN: "${APIFY_API_TOKEN}"
       GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY}
       REDIS_URL: "redis://redis:6379/0"
     depends_on:

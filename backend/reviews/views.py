@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework import viewsets, permissions, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from .models import Review, ReviewLike, ReviewComment
 from .serializers import ReviewSerializer, ReviewLikeSerializer, ReviewCommentSerializer
 from .sentiment_groq import analyze_sentiment
@@ -39,65 +40,43 @@ class ReviewViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             return [permissions.AllowAny()]
-        elif self.action in ['update', 'partial_update', 'destroy', 'create']:
+        elif self.action in ['create']:
             return [permissions.IsAuthenticated()]
-        return [permissions.AllowAny()]
+        #update, partial_update, destroy- only owner
+        return [permissions.IsAuthenticated(), IsOwnerOrReadOnly()]
     
     #validates request data through serializer
     def perform_create(self, serializer):
-        #since user is read_only in review model, we fetch the user info from request.user set by jwt 
-        text = serializer.validated_data.get('text', '')
-        book = serializer.validated_data.get('book')
-        
-        existing = Review.objects.filter(user=self.request.user, book=book).first()
-        
-        if existing:
-            existing.rating = serializer.validated_data.get('rating', existing.rating)
-            existing.text = text
-            existing.contains_spoilers = serializer.validated_data.get('contains_spoilers', False)
-            existing.sentiment = 'pending'
-            existing.save()
-            
-            #dispatch to celery, run in bg
-            analyze_sentiment_task.delay(str(existing.id))
-            return
-        
-        #read_only fields can't come from request data, so we manually inject them 
-        review = serializer.save(
-            user=self.request.user,
-            sentiment='pending', #temporary, celery will update this
-        )
-        
-        #dispatch to celery
+        review = serializer.save(user=self.request.user, sentiment='pending')
         analyze_sentiment_task.delay(str(review.id))
         
-        #update book stats
-        stats = Review.objects.filter(book=book).aggregate(
-            avg=Avg('rating'),
-            count=Count('id'),
-        )
-        book.avg_rating = stats['avg'] or 0
-        book.rating_count = stats['count'] or 0
-        book.save(update_fields=['avg_rating', 'rating_count'])
-        
     def perform_update(self, serializer):
-        text = serializer.validated_data.get('text', serializer.instance.text)
-        serializer.save(sentiment='pending')
-        analyze_sentiment_task(str(review.id))
+        old_text = serializer.instance.text
+        review = serializer.save(sentiment='pending')
+        # Only re-run sentiment if text actually changed
+        if review.text != old_text:
+            analyze_sentiment_task.delay(str(review.id))
+        # Book stats handled by signal — no manual update needed
+        
+    def perform_destroy(self, instance):
+        if instance.user != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You can only delete your own reviews.")
+        instance.delete()
     
 #     POST   /api/v1/reviews/{id}/like/   → like
 #     DELETE /api/v1/reviews/{id}/like/   → unlike  
     @action(detail=True, methods=['post','delete'], permission_classes=[permissions.IsAuthenticated])
     def like(self, request, pk=None):
         review = self.get_object()
-        if request.method == 'POST':
-            ReviewLike.objects.get_or_create(user=request.user, review=review)
-        else:
-            ReviewLike.objects.filter(user=request.user, review=review).delete()
+        like, created = ReviewLike.objects.get_or_create(user=request.user, review=review)
+        
+        if not created:
+            like.delete()
             
         review.like_count = review.likes.count()
         review.save(update_fields=['like_count'])
-        return Response({"like_count": review.like_count})
+        return Response({'like_count': review.like_count, "liked": created})
     
 
 # GET /api/v1/reviews/{id}/comment -> get all comments for that review
