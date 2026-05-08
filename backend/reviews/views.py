@@ -7,7 +7,7 @@ from .models import Review, ReviewLike, ReviewComment
 from .serializers import ReviewSerializer, ReviewLikeSerializer, ReviewCommentSerializer
 from .sentiment_groq import analyze_sentiment
 from .tasks import analyze_sentiment_task
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, F
 
 
 # Owner or read-only permissions
@@ -38,9 +38,9 @@ class ReviewViewSet(viewsets.ModelViewSet):
         return qs
     
     def get_permissions(self):
-        if self.action in ['list', 'retrieve']:
+        if self.action in ['list', 'retrieve', 'likes']:
             return [permissions.AllowAny()]
-        elif self.action in ['create']:
+        elif self.action in ['create', 'like', 'comment']:
             return [permissions.IsAuthenticated()]
         #update, partial_update, destroy- only owner
         return [permissions.IsAuthenticated(), IsOwnerOrReadOnly()]
@@ -73,10 +73,26 @@ class ReviewViewSet(viewsets.ModelViewSet):
         
         if not created:
             like.delete()
-            
-        review.like_count = review.likes.count()
-        review.save(update_fields=['like_count'])
+           
+        # will cause race condition 
+        # review.like_count = review.likes.count() #read
+        # review.save(update_fields=['like_count']) #write
+        if created:
+            Review.objects.filter(pk=review.pk).update(like_count=F('like_count') + 1)
+        else:
+            Review.objects.filter(pk=review.pk).update(like_count=F('like_count') - 1)
+        
+        review.refresh_from_db() #rerun SELECT and updates the Python object with DB's current value
         return Response({'like_count': review.like_count, "liked": created})
+    
+    @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny])
+    def likes(self, request, pk=None):
+        review = self.get_object()
+        usernames = review.likes.select_related('user').values_list('user__username', flat=True) #values_list('user_username, flat=True), in stead of fetching full User objects and serializing them, fetch the username strings as flat list
+        #review.likes -> WHERE review_id = <this review's id>, give me all likes on this review
+        
+        return Response({'like_count': review.like_count, 'liked_by': list(usernames)})
+        
     
 
 # GET /api/v1/reviews/{id}/comment -> get all comments for that review

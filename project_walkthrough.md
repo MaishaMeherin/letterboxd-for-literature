@@ -159,3 +159,56 @@ print(f'Without tags: {without_tags}')
 
 admin
 admin1234
+
+
+# make apps
+docker compose exec backend uv run python manage.py startapp notifications
+
+docker compose exec backend uv run python manage.py makemigrations notifications
+
+docker compose exec backend uv run python manage.py migrate
+
+
+# stats
+docker compose exec backend uv run python manage.py startapp stats
+
+# call celery to fetch books
+docker compose exec backend uv run python manage.py shell -c "from books.tasks import fetch_new_releases; fetch_new_releases.delay()"
+
+# test run to check if Apify works
+docker compose exec backend uv run python manage.py shell -c "
+from apify_client import ApifyClient
+from django.conf import settings
+
+client = ApifyClient(settings.APIFY_API_TOKEN)
+
+run = client.actor('sk1JsDmbderUw0J79').call(
+    run_input={
+        'startUrls': [
+            'https://www.goodreads.com/genres/new_releases/fiction'
+        ],
+        'maxItems': 5,
+        'proxy': {'useApifyProxy': True},
+    }
+)
+
+print('Run status:', run.get('status'))
+
+items = list(
+    client.dataset(run['defaultDatasetId']).iterate_items()
+)
+
+print('Items count:', len(items))
+
+for item in items:
+    print(
+        '-',
+        item.get('title'),
+        '|',
+        item.get('firstPublishedDate')
+    )
+"
+
+
+# add google auth
+docker compose run --rm backend uv add google-auth

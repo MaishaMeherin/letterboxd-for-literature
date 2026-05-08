@@ -145,6 +145,7 @@ def normalize_google_book(item):
     }
 
 
+
 class Command(BaseCommand):
     help = "Seed books from Google Books API across multiple categories"
 

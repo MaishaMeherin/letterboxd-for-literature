@@ -11,6 +11,28 @@ import {
 } from "../store";
 import Navbar from "../components/Navbar";
 
+function ExpandableDescription({ text }) {
+  const [expanded, setExpanded] = useState(false);
+  const limit = 300;
+  const isLong = text.length > limit;
+
+  return (
+    <div>
+      <p className="text-sm text-stone-500 leading-relaxed">
+        {isLong && !expanded ? `${text.slice(0, limit)}…` : text}
+      </p>
+      {isLong && (
+        <button
+          onClick={() => setExpanded(prev => !prev)}
+          className="text-xs text-emerald-700 hover:text-emerald-900 mt-1 font-medium transition-colors"
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function BookPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -148,7 +170,7 @@ function BookPage() {
     if (!existingReview) return;
 
     try {
-      await api.delete(`/api/v1/reviews/${existingReview.id}`);
+      await api.delete(`/api/v1/reviews/${existingReview.id}/`);
       setExistingReview(null);
       setRating(0);
       setReviewText("");
@@ -259,9 +281,7 @@ function BookPage() {
               </span>
             </div>
 
-            <p className="text-sm text-stone-500 leading-relaxed line-clamp-4">
-              {book?.description || "No description available."}
-            </p>
+            <ExpandableDescription text={book?.description || "No description available."} />
           </div>
         </div>
 
@@ -331,6 +351,14 @@ function BookPage() {
           >
             Read Preview
           </button>
+          <a
+            href={`https://www.goodreads.com/search?q=${encodeURIComponent(book?.title || "")}+${encodeURIComponent(book?.authors?.[0] || "")}+quotes&search%5Bsource%5D=goodreads&search_type=quotes&tab=quotes`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 h-11 rounded-full border border-stone-300 text-stone-700 text-sm font-medium tracking-wide hover:border-stone-500 hover:text-stone-900 transition-colors flex items-center justify-center gap-1.5"
+          >
+            Quotes ↗
+          </a>
         </div>
 
         {/* ── Sentiment Chart ── */}

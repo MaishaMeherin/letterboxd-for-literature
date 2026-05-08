@@ -2,6 +2,7 @@ import { useState } from "react";
 import api from "../api";
 import { useNavigate } from "react-router-dom";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
+import { GoogleLogin } from "@react-oauth/google";
 
 function FormManual({ route, method }) {
   const navigate = useNavigate();
@@ -12,6 +13,20 @@ function FormManual({ route, method }) {
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      localStorage.removeItem(ACCESS_TOKEN);
+      const res = await api.post("/api/v1/auth/google/", {
+        credential: credentialResponse.credential,
+      });
+      localStorage.setItem(ACCESS_TOKEN, res.data.access);
+      localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
+      navigate("/");
+    } catch {
+      setError("Google sign-in failed. Please try again.");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -115,6 +130,22 @@ function FormManual({ route, method }) {
               {loading ? "Please wait..." : isLogin ? "Sign in" : "Create account"}
             </button>
           </form>
+
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-stone-200" />
+            <span className="text-xs text-stone-400">or</span>
+            <div className="flex-1 h-px bg-stone-200" />
+          </div>
+
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError("Google sign-in failed. Please try again.")}
+              theme="outline"
+              shape="rectangular"
+              width={400}
+            />
+          </div>
         </div>
 
         {/* Switch link */}

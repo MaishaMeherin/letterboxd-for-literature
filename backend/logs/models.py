@@ -21,6 +21,7 @@ class ReadingLog(models.Model):
     current_page = models.PositiveIntegerField(default=0)
     progress = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     notes = models.TextField(blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -28,9 +29,11 @@ class ReadingLog(models.Model):
         ordering = ['-created_at']
 
     def save(self, *args, **kwargs):
-        # Auto-calculate progress
+        from django.utils import timezone
         if self.book.page_count and self.current_page:
             self.progress = (self.current_page / self.book.page_count) * 100
+        if self.status == "completed" and self.completed_at is None:
+            self.completed_at = timezone.now()
         super().save(*args, **kwargs)
 
     def __str__(self):

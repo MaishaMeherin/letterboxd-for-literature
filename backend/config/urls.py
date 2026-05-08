@@ -26,4 +26,6 @@ urlpatterns = [
     path("api/v1/", include('reviews.urls')),
     path("api/v1/", include('recommendations.urls')),
     path("api/v1/", include('playlists.urls')),
+    path("api/v1/", include('notifications.urls')),
+    path("api/v1/", include('stats.urls')),
 ]

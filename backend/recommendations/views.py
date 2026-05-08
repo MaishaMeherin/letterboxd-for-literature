@@ -40,7 +40,10 @@ class RecommendationsView(APIView):
             return Response(RecommendationsSerializer(existing_recs, many=True).data)
         
         #if stale, enqueue celery tasks
-        generate_recommendations_task.apply_async(args = [request.user.id], tasks_id = f"recs-{request.user.id}", ) #.delay()-> run this in the background, HTTP request continues immediately after this line
+        generate_recommendations_task.apply_async(
+            args = [request.user.id], 
+            tasks_id = f"recs-{request.user.id}", 
+        ) #.delay()-> run this in the background, HTTP request continues immediately after this line
         
         if existing_recs.exists():
             #return stale recs immediately while new one are being generated in the background
@@ -48,3 +51,15 @@ class RecommendationsView(APIView):
         
         #first time nothing to show yet
         return Response({"status": "generating"}, status=202)
+    
+class RecommendationRefreshView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, format=None):
+        Recommendations.objects.filter(user=request.user).delete()
+        
+        generate_recommendations_task.apply_async(
+            args = [request.user.id], 
+            tasks_id = f"recs-{request.user.id}", 
+        )
+        return Response({"status": "generating"}, status=202) 

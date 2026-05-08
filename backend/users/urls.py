@@ -1,10 +1,11 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import RegisterView, MeView
+from .views import RegisterView, MeView, GoogleAuthView
 
 urlpatterns = [
     path('auth/register/', RegisterView.as_view(), name="register"),
     path('auth/login/', TokenObtainPairView.as_view(), name="login"),
     path('auth/refresh', TokenRefreshView.as_view(), name="token_refresh"),
+    path('auth/google/', GoogleAuthView.as_view(), name="google-auth"),
     path('users/me/', MeView.as_view(), name='me'),
 ]

@@ -5,5 +5,5 @@ class RecommendationsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recommendations
          
-        fields = ['id', 'title', 'author', 'genre', 'tier', 'cover_url', 'user', 'reason', 'created_at']
+        fields = ['id', 'book', 'title', 'author', 'genre', 'tier', 'cover_url', 'user', 'reason', 'created_at']
         read_only_fields = fields

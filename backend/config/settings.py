@@ -27,6 +27,9 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-fallback")
 
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 GOOGLE_BOOKS_API_KEY = os.environ.get('GOOGLE_BOOKS_API_KEY', '')
+APIFY_API_TOKEN = os.environ.get('APIFY_API_TOKEN', '')
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -46,6 +49,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'channels',
     
     #my apps
     'users',
@@ -55,6 +59,8 @@ INSTALLED_APPS = [
     'shelves',
     'recommendations',
     'playlists',
+    'notifications',
+    'stats',
     
     'django_celery_results',
 ]
@@ -183,3 +189,27 @@ CELERY_RESULT_BACKEND = 'django-db'
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = 'json'
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    "fetch-new-releases-weekly": {
+        "task": "books.tasks.fetch_new_releases", #dotted path to the function celery should call
+        "schedule": crontab(day_of_week=1, hour=3, minute=0), #Monday 3am
+    },
+}
+
+CELERY_BEAT_SCHEDULE = {
+    "tag-untagged-books-daily": {
+        "task": "books.tasks.tag_untagged_books_daily",
+        "schedule": crontab(hour=3, minute=0), #3am daily, after quota resets
+    }
+}
+
+CHANNEL_LAYERS = { "default": {
+                            "BACKEND": "channels_redis.core.RedisChannelLayer",
+                            "CONFIG": {
+                                "hosts": [os.environ.get("REDIS_URL",
+                                "redis://localhost:6379/0")],
+                            },
+                        },
+                }

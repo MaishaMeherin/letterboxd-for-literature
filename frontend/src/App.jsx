@@ -9,6 +9,8 @@ import PlaylistPage from './pages/PlaylistPage';
 import WelcomePage from "./pages/Welcome/WelcomePage";
 import BookPreviewPage from "./pages/BookPreviewPage";
 import RecommendationsPage from "./pages/RecommendationsPage";
+import StatsPage from "./pages/StatsPage";
+import SpotifyCallbackPage from "./pages/SpotifyCallbackPage";
 
 function Logout() {
   localStorage.clear();
@@ -35,6 +37,8 @@ function App() {
           <Route path="/book/:id/playlist" element={<PlaylistPage />} />
           <Route path="/book/:id/preview" element={<BookPreviewPage/>} />
           <Route path="/recommendations" element={<RecommendationsPage/>} />
+          <Route path="/stats" element={<StatsPage />} />
+          <Route path="/spotify-callback" element={<SpotifyCallbackPage />} />
         </Routes>
       </BrowserRouter>
     </>
